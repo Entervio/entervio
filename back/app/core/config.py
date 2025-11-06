@@ -1,6 +1,8 @@
 # app/core/config.py
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
+from typing import Optional
+from pydantic import Field
 
 class Settings(BaseSettings):
     # Application
@@ -26,6 +28,12 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
     ELEVENLABS_API_KEY: str = ""
+
+    GROQ_API_KEY: str = ""  # ADD THIS
+    TTS_VOICE: str = Field(default="en-US-AriaNeural")
+    TTS_RATE: str = Field(default="+0%")
+    TTS_VOLUME: str = Field(default="+0%")
+    WS_HEARTBEAT_INTERVAL: int = Field(default=30)
     
     model_config = SettingsConfigDict(
         env_file=".env",
