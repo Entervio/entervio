@@ -30,7 +30,8 @@ class Settings(BaseSettings):
     ELEVENLABS_API_KEY: str = ""
 
     GROQ_API_KEY: str = ""  # ADD THIS
-    TTS_VOICE: str = Field(default="en-US-AriaNeural")
+    GEMINI_API_KEY: str = Field(..., env="GEMINI_API_KEY")
+    TTS_VOICE: str = Field(default="fr-FR-DeniseNeural")
     TTS_RATE: str = Field(default="+0%")
     TTS_VOLUME: str = Field(default="+0%")
     WS_HEARTBEAT_INTERVAL: int = Field(default=30)
