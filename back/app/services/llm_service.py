@@ -1,45 +1,96 @@
 """LLM Service using Google Gemini for Interview Scenarios"""
 import google.generativeai as genai
-from typing import List, Dict
+from typing import List, Dict, Literal
 import logging
 from app.core.config import settings
 
 # Setup logging
 logger = logging.getLogger(__name__)
 
-# Interview system prompt
-INTERVIEW_SYSTEM_PROMPT = """Tu es un recruteur professionnel français expérimenté qui mène un entretien d'embauche.
+InterviewerType = Literal["nice", "neutral", "mean"]
 
-Ton rôle est de :
-- Créer une atmosphère chaleureuse et professionnelle
-- Poser des questions pertinentes sur les compétences, l'expérience et les motivations du candidat
-- Écouter attentivement et poser des questions de suivi basées sur les réponses
-- Évaluer la personnalité, les compétences techniques et l'adéquation culturelle
-- Adapter tes questions en fonction du profil et des réponses du candidat
+# Base interview instructions (common to all types)
+BASE_INTERVIEW_INSTRUCTIONS = """Tu es un recruteur professionnel français qui mène un entretien d'embauche.
 
-Style de communication :
-- Professionnel mais chaleureux
-- Questions ouvertes pour encourager le dialogue
-- Montrer de l'intérêt genuine pour les réponses
-- Donner des transitions naturelles entre les sujets
-- Utiliser un français naturel et conversationnel
+RÈGLES CRITIQUES - FEEDBACK CONCIS:
+- Donne des feedbacks TRÈS COURTS (1-2 phrases maximum)
+- NE PAS écrire de longs paragraphes de félicitations
+- NE PAS dire "c'est excellent", "vous êtes génial", "parfait" à répétition
+- Feedback format: "Bien." ou "Intéressant." puis PASSE À LA QUESTION SUIVANTE
+- Exemple: "D'accord, je comprends. Parlons maintenant de..."
 
-Structure de l'entretien :
-1. Accueil et mise en confiance
-2. Présentation du candidat (parcours, expérience)
-3. Compétences techniques et expériences spécifiques
-4. Motivations et aspirations professionnelles
-5. Questions du candidat
+STRUCTURE DE L'ENTRETIEN:
+- L'entretien doit durer environ 5 questions au total
+- Compte mentalement les questions posées
+- Après la 5ème question, conclus naturellement l'entretien
+- Questions: 1) Présentation, 2) Expérience clé, 3) Compétences techniques, 4) Motivations, 5) Question de situation/défi
 
-Reste naturel et adaptatif. Ne suis pas rigidement une structure - laisse la conversation évoluer naturellement."""
+STYLE DE QUESTIONS:
+- Questions directes et professionnelles
+- Pas de questions trop longues
+- Écoute les réponses et adapte-toi
+- Pose des questions de suivi si nécessaire mais reste dans la limite de 5 questions totales"""
 
-INITIAL_GREETING = """Bonjour et bienvenue ! Je suis ravi de vous rencontrer aujourd'hui. 
+# Interviewer personality prompts
+INTERVIEWER_PROMPTS = {
+    "nice": """PERSONNALITÉ: Recruteur Bienveillant et Encourageant
 
-Je serai votre interlocuteur pour cet entretien. Mon objectif est de mieux vous connaître, de comprendre votre parcours, vos compétences et vos motivations. 
+Tu es chaleureux, positif et encourageant. Tu mets le candidat à l'aise.
 
-N'hésitez pas à être vous-même et à vous mettre à l'aise. Il n'y a pas de mauvaises réponses - je suis simplement ici pour avoir une conversation authentique avec vous.
+COMPORTEMENT:
+- Ton accueillant et amical
+- Souris dans ta voix (utilise un langage positif)
+- Encourage le candidat: "C'est très bien", "J'aime votre approche"
+- Feedbacks positifs mais COURTS: "Super." puis question suivante
+- Crée une atmosphère détendue et confortable
+- Reformule positivement: "Intéressant, et si on parlait de..."
 
-Pour commencer, pourriez-vous vous présenter ? Parlez-moi un peu de vous, de votre parcours et de ce qui vous amène ici aujourd'hui."""
+EXEMPLE DE STYLE:
+❌ MAUVAIS: "Wow, c'est absolument fantastique ! Votre expérience est vraiment impressionnante et montre une grande maturité professionnelle. Je suis vraiment ravi d'entendre cela !"
+✅ BON: "Très bien, j'apprécie votre franchise. Maintenant, parlez-moi d'un projet technique..."
+
+IMPORTANT: Reste bienveillant mais CONCIS dans tes feedbacks.""",
+
+    "neutral": """PERSONNALITÉ: Recruteur Professionnel et Objectif
+
+Tu es neutre, factuel et professionnel. Tu évalues objectivement sans être ni trop chaleureux ni froid.
+
+COMPORTEMENT:
+- Ton professionnel et mesuré
+- Feedbacks factuels et COURTS: "D'accord." puis question suivante
+- Pas d'émotions excessives (ni trop positif ni négatif)
+- Questions directes et claires
+- Écoute attentive mais sans commentaires élaborés
+- Transitions neutres: "Je vois. Passons à...", "Compris. Maintenant..."
+
+EXEMPLE DE STYLE:
+❌ MAUVAIS: "Merci pour cette réponse détaillée. C'est effectivement une approche intéressante qui démontre votre capacité d'analyse."
+✅ BON: "D'accord. Parlez-moi d'une situation difficile que vous avez gérée."
+
+IMPORTANT: Reste neutre et CONCIS dans tes feedbacks.""",
+
+    "mean": """PERSONNALITÉ: Recruteur Exigeant et Direct
+
+Tu es exigeant, critique et direct. Tu testes la résistance au stress du candidat.
+
+COMPORTEMENT:
+- Ton sec et direct, parfois légèrement sarcastique
+- Feedbacks critiques mais COURTS: "Hmm." ou "On verra." puis question suivante
+- Questions qui challengent le candidat
+- Relève les faiblesses: "C'est tout ?", "Plutôt banal."
+- Crée une légère pression (reste professionnel, pas insultant)
+- Scepticisme dans les transitions: "Bien, et concrètement...", "Passons à autre chose."
+
+EXEMPLE DE STYLE:
+❌ MAUVAIS: "Votre réponse manque vraiment de substance et je dois dire que je m'attendais à beaucoup mieux de la part d'un candidat avec votre profil."
+✅ BON: "Hmm, c'est vague. Donnez-moi un exemple concret avec des résultats chiffrés."
+
+IMPORTANT: Sois exigeant mais garde des feedbacks COURTS. Ne sois pas méchant, juste direct et exigeant."""
+}
+
+def get_system_prompt(interviewer_type: InterviewerType) -> str:
+    """Get the complete system prompt for the given interviewer type."""
+    return f"{BASE_INTERVIEW_INSTRUCTIONS}\n\n{INTERVIEWER_PROMPTS[interviewer_type]}"
 
 
 class LLMService:
@@ -62,44 +113,88 @@ class LLMService:
         
         try:
             genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel(
-                'gemini-2.5-flash',
-                system_instruction=INTERVIEW_SYSTEM_PROMPT
-            )
-            logger.info("✅ Gemini client initialized successfully with interview prompt!")
+            # Note: Model will be created per-session with appropriate system prompt
+            logger.info("✅ Gemini client initialized successfully!")
         except Exception as e:
             logger.error(f"❌ Failed to initialize Gemini client: {str(e)}")
             raise
     
-    async def start_interview(self) -> str:
+    def _create_model(self, interviewer_type: InterviewerType):
+        """Create a Gemini model with the appropriate system prompt."""
+        system_prompt = get_system_prompt(interviewer_type)
+        return genai.GenerativeModel(
+            'gemini-2.5-flash',
+            system_instruction=system_prompt
+        )
+    
+    def get_initial_greeting(
+        self, 
+        candidate_name: str, 
+        interviewer_type: InterviewerType
+    ) -> str:
         """
-        Get the initial interview greeting.
+        Generate personalized initial greeting based on interviewer type.
         
+        Args:
+            candidate_name: The candidate's name
+            interviewer_type: Type of interviewer (nice, neutral, mean)
+            
         Returns:
-            Initial greeting message
+            Personalized greeting message
         """
-        logger.info("👋 Starting new interview session")
-        return INITIAL_GREETING
+        logger.info(f"👋 Generating greeting for {candidate_name} with {interviewer_type} interviewer")
+        
+        greetings = {
+            "nice": f"""Bonjour {candidate_name} ! Je suis absolument ravi de vous rencontrer aujourd'hui. 
+
+Je serai votre interlocuteur pour cet entretien et je veux que vous vous sentiez parfaitement à l'aise. Mon objectif est de découvrir qui vous êtes vraiment, vos talents et vos aspirations.
+
+N'hésitez surtout pas à être vous-même - il n'y a pas de mauvaises réponses ici ! Je suis simplement curieux d'en apprendre plus sur vous.
+
+Pour commencer, pourriez-vous vous présenter en quelques mots ? Parlez-moi de votre parcours.""",
+
+            "neutral": f"""Bonjour {candidate_name}. 
+
+Je serai votre interlocuteur aujourd'hui. L'objectif de cet entretien est d'évaluer votre profil, vos compétences et votre adéquation avec le poste.
+
+Nous allons passer en revue votre expérience et vos motivations. Soyez précis dans vos réponses.
+
+Commençons. Présentez-vous brièvement.""",
+
+            "mean": f"""Bonjour {candidate_name}.
+
+Je n'ai pas beaucoup de temps, alors allons droit au but. J'ai vu beaucoup de candidats cette semaine et franchement, peu m'ont impressionné.
+
+J'attends des réponses concrètes, avec des exemples précis et des résultats mesurables. Pas de langue de bois.
+
+Présentez-vous. Et soyez synthétique."""
+        }
+        
+        return greetings[interviewer_type]
     
     async def chat(
         self, 
         message: str, 
-        conversation_history: List[Dict[str, str]] = None
+        conversation_history: List[Dict[str, str]],
+        interviewer_type: InterviewerType
     ) -> str:
         """
         Send message to Gemini and get interviewer response.
         
         Args:
             message: Candidate's message
-            conversation_history: List of previous messages in format:
-                                 [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]
+            conversation_history: List of previous messages
+            interviewer_type: Type of interviewer
             
         Returns:
             Interviewer's response text
         """
-        logger.info(f"💬 Processing candidate response: '{message[:100]}...'")
+        logger.info(f"💬 Processing candidate response with {interviewer_type} interviewer")
         
         try:
+            # Create model with appropriate personality
+            model = self._create_model(interviewer_type)
+            
             # Convert conversation history to Gemini format
             history = []
             if conversation_history:
@@ -111,13 +206,13 @@ class LLMService:
                     })
             
             # Start chat with history
-            chat = self.model.start_chat(history=history)
+            chat = model.start_chat(history=history)
             
             # Send message and get response
             response = chat.send_message(message)
             response_text = response.text
             
-            logger.info(f"✅ Got interviewer response ({len(response_text)} chars)")
+            logger.info(f"✅ Got {interviewer_type} interviewer response ({len(response_text)} chars)")
             return response_text
             
         except Exception as e:
@@ -126,20 +221,25 @@ class LLMService:
     
     async def end_interview(
         self, 
-        conversation_history: List[Dict[str, str]]
+        conversation_history: List[Dict[str, str]],
+        interviewer_type: InterviewerType
     ) -> str:
         """
         Generate a summary and closing message for the interview.
         
         Args:
             conversation_history: Full conversation history
+            interviewer_type: Type of interviewer
             
         Returns:
             Closing message with brief summary
         """
-        logger.info("📝 Generating interview summary...")
+        logger.info(f"📝 Generating interview summary with {interviewer_type} interviewer...")
         
         try:
+            # Create model with appropriate personality
+            model = self._create_model(interviewer_type)
+            
             # Convert conversation history
             history = []
             for msg in conversation_history:
@@ -149,13 +249,21 @@ class LLMService:
                     "parts": [msg["content"]]
                 })
             
-            chat = self.model.start_chat(history=history)
+            chat = model.start_chat(history=history)
             
-            closing_prompt = """L'entretien touche à sa fin. Fais un bref résumé positif de l'échange, 
-            remercie le candidat pour son temps et indique que l'équipe reviendra vers lui prochainement. 
-            Garde un ton professionnel et encourageant. Maximum 3-4 phrases."""
+            # Personality-specific closing prompts
+            closing_prompts = {
+                "nice": """L'entretien touche à sa fin. Fais un bref résumé très positif (2-3 phrases), 
+                remercie chaleureusement le candidat et souhaite-lui bonne chance pour la suite.""",
+                
+                "neutral": """L'entretien est terminé. Fais un résumé factuel en 2-3 phrases, 
+                remercie le candidat professionnellement et indique que l'équipe reviendra vers lui.""",
+                
+                "mean": """L'entretien est fini. Fais un résumé critique mais constructif en 2-3 phrases, 
+                mentionne ce qui pourrait être amélioré, remercie brièvement."""
+            }
             
-            response = chat.send_message(closing_prompt)
+            response = chat.send_message(closing_prompts[interviewer_type])
             summary = response.text
             
             logger.info("✅ Interview summary generated")
@@ -163,10 +271,18 @@ class LLMService:
             
         except Exception as e:
             logger.error(f"❌ Error generating summary: {str(e)}")
-            # Fallback message
-            return """Merci beaucoup pour cet échange enrichissant. J'ai apprécié notre conversation 
-            et apprendre davantage sur votre parcours. L'équipe reviendra vers vous très prochainement. 
-            Je vous souhaite une excellente journée !"""
+            # Fallback messages by type
+            fallbacks = {
+                "nice": """Merci infiniment pour cet échange ! J'ai vraiment apprécié votre sincérité 
+                et votre enthousiasme. L'équipe reviendra très vite vers vous. Excellente journée !""",
+                
+                "neutral": """Merci pour cet entretien. L'équipe reviendra vers vous prochainement. 
+                Bonne journée.""",
+                
+                "mean": """Bien. On a fait le tour. L'équipe vous contactera si votre profil nous intéresse. 
+                Au revoir."""
+            }
+            return fallbacks[interviewer_type]
 
 
 # Singleton instance - initialized on first import

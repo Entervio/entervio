@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import type { Route } from "./+types/home";
+import { useLocation, useNavigate } from "react-router";
+import type { Route } from "./+types/interview";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Entretien d'Embauche IA - Pratique" },
-    { name: "description", content: "Pratiquez vos entretiens avec un recruteur IA" },
+    { title: "Entretien en cours - Entretien d'Embauche IA" },
+    { name: "description", content: "Entretien d'embauche avec recruteur IA" },
   ];
 }
 
@@ -15,9 +16,24 @@ interface Message {
   timestamp: Date;
 }
 
+type InterviewerType = "nice" | "neutral" | "mean";
+
 const API_BASE_URL = `http://${window.location.hostname}:8000/api/v1/voice`;
 
-export default function Home() {
+const interviewerLabels = {
+  nice: { name: "Bienveillant", icon: "😊", color: "text-green-700", bg: "bg-green-50" },
+  neutral: { name: "Neutre", icon: "😐", color: "text-blue-700", bg: "bg-blue-50" },
+  mean: { name: "Exigeant", icon: "😤", color: "text-red-700", bg: "bg-red-50" },
+};
+
+export default function Interview() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  // Get candidate info from navigation state
+  const candidateName = location.state?.candidateName as string;
+  const interviewerType = location.state?.interviewerType as InterviewerType;
+
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -25,11 +41,19 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [questionCount, setQuestionCount] = useState(0);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Redirect if missing required data
+  useEffect(() => {
+    if (!candidateName || !interviewerType) {
+      navigate("/setup");
+    }
+  }, [candidateName, interviewerType, navigate]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -38,8 +62,10 @@ export default function Home() {
 
   // Start interview on component mount
   useEffect(() => {
-    startInterview();
-  }, []);
+    if (candidateName && interviewerType) {
+      startInterview();
+    }
+  }, [candidateName, interviewerType]);
 
   const startInterview = async () => {
     try {
@@ -48,6 +74,13 @@ export default function Home() {
 
       const response = await fetch(`${API_BASE_URL}/interview/start`, {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          candidate_name: candidateName,
+          interviewer_type: interviewerType,
+        }),
       });
 
       if (!response.ok) {
@@ -190,6 +223,9 @@ export default function Home() {
 
       const data = await response.json();
 
+      // Update question count
+      setQuestionCount(data.question_count);
+
       // Add user message
       const userMessage: Message = {
         id: `${Date.now()}-user`,
@@ -253,7 +289,6 @@ export default function Home() {
       await playAudio(sessionId, data.summary);
 
       setInterviewStarted(false);
-      setSessionId(null);
       setIsProcessing(false);
       
     } catch (err) {
@@ -270,16 +305,15 @@ export default function Home() {
       currentAudioRef.current = null;
     }
     
-    setMessages([]);
-    setSessionId(null);
-    setInterviewStarted(false);
-    setIsProcessing(false);
-    setIsRecording(false);
-    setError(null);
-    
-    // Start new interview
-    startInterview();
+    // Navigate back to setup
+    navigate("/setup");
   };
+
+  if (!candidateName || !interviewerType) {
+    return null; // Will redirect via useEffect
+  }
+
+  const interviewerInfo = interviewerLabels[interviewerType];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100">
@@ -289,11 +323,16 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-800 mb-2">
-                🎯 Entretien d'Embauche IA
+                🎯 Entretien d'Embauche
               </h1>
-              <p className="text-gray-600">
-                Pratiquez avec un recruteur virtuel professionnel
-              </p>
+              <div className="flex items-center gap-3 text-gray-600">
+                <span className="font-medium">Candidat: {candidateName}</span>
+                <span className="text-gray-400">•</span>
+                <div className={`flex items-center gap-1 ${interviewerInfo.color}`}>
+                  <span className="text-lg">{interviewerInfo.icon}</span>
+                  <span className="font-medium">{interviewerInfo.name}</span>
+                </div>
+              </div>
             </div>
             <div className="flex flex-col items-end gap-2">
               <div className="flex items-center gap-2">
@@ -307,17 +346,19 @@ export default function Home() {
                 </span>
               </div>
               {interviewStarted && (
-                <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full font-medium">
-                  Entretien en cours
-                </span>
-              )}
-              {isPlayingAudio && (
-                <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-medium flex items-center gap-1">
-                  <svg className="w-3 h-3 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" />
-                  </svg>
-                  Lecture audio
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full font-medium">
+                    Question {questionCount}/5
+                  </span>
+                  {isPlayingAudio && (
+                    <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-medium flex items-center gap-1">
+                      <svg className="w-3 h-3 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" />
+                      </svg>
+                      Audio
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -355,7 +396,7 @@ export default function Home() {
               </svg>
               <p className="text-lg font-medium">Démarrage de l'entretien...</p>
               <p className="text-sm text-center mt-2">
-                Le recruteur prépare votre accueil
+                Le recruteur {interviewerInfo.name.toLowerCase()} prépare votre accueil
               </p>
             </div>
           ) : (
@@ -371,12 +412,14 @@ export default function Home() {
                     className={`max-w-[80%] rounded-2xl px-6 py-3 ${
                       message.role === "user"
                         ? "bg-indigo-600 text-white"
-                        : "bg-gradient-to-br from-purple-50 to-blue-50 text-gray-800 border border-purple-100"
+                        : `${interviewerInfo.bg} text-gray-800 border-2 ${interviewerInfo.color.replace('text-', 'border-')}`
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs font-medium opacity-75">
-                        {message.role === "user" ? "👤 Vous" : "🎯 Recruteur"}
+                        {message.role === "user" 
+                          ? `👤 ${candidateName}` 
+                          : `${interviewerInfo.icon} Recruteur`}
                       </span>
                       <span className="text-xs opacity-50">
                         {message.timestamp.toLocaleTimeString("fr-FR", {
@@ -484,14 +527,14 @@ export default function Home() {
                       d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                     />
                   </svg>
-                  <span className="hidden sm:inline">Recommencer</span>
+                  <span className="hidden sm:inline">Nouvel entretien</span>
                 </div>
               </button>
             )}
           </div>
 
           {/* Instructions */}
-          <div className="mt-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-100">
+          <div className={`mt-4 p-4 rounded-lg border-2 ${interviewerInfo.bg} ${interviewerInfo.color.replace('text-', 'border-')}`}>
             <p className="text-sm text-gray-700">
               <strong>💡 Instructions :</strong> Attendez que le recruteur termine sa question 
               (l'audio doit finir de jouer), puis cliquez sur "Répondre" pour parler. 

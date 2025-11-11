@@ -1,10 +1,11 @@
 """Voice Chat REST API Endpoint"""
 from fastapi import APIRouter, File, UploadFile, HTTPException, Form
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 import json
 import tempfile
 import os
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional, Literal
 import logging
 
 from app.services.voice_service import voice_service
@@ -14,43 +15,63 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+InterviewerType = Literal["nice", "neutral", "mean"]
+
 # Store active conversations (in production, use Redis or database)
-# Key: session_id, Value: conversation history
-active_conversations: Dict[str, List[Dict[str, str]]] = {}
+# Key: session_id, Value: session data
+active_sessions: Dict[str, Dict] = {}
+
+
+class StartInterviewRequest(BaseModel):
+    candidate_name: str
+    interviewer_type: InterviewerType
 
 
 @router.post("/interview/start")
-async def start_interview():
+async def start_interview(request: StartInterviewRequest):
     """
-    Start a new interview session.
+    Start a new interview session with candidate name and interviewer type.
+    
+    Args:
+        request: Contains candidate_name and interviewer_type
     
     Returns:
-        JSON with session_id, greeting text, and audio URL
+        JSON with session_id, greeting text, and session details
     """
     try:
         # Generate unique session ID
         import uuid
         session_id = str(uuid.uuid4())
         
-        # Initialize conversation history
-        active_conversations[session_id] = []
+        # Initialize session data
+        active_sessions[session_id] = {
+            "candidate_name": request.candidate_name,
+            "interviewer_type": request.interviewer_type,
+            "conversation_history": [],
+            "question_count": 0
+        }
         
-        logger.info(f"✅ Started new interview session: {session_id}")
+        logger.info(f"✅ Started interview: {session_id} | {request.candidate_name} | {request.interviewer_type}")
         
-        # Get initial greeting
-        greeting_text = await llm_service.start_interview()
+        # Get personalized greeting
+        greeting_text = llm_service.get_initial_greeting(
+            candidate_name=request.candidate_name,
+            interviewer_type=request.interviewer_type
+        )
         
         # Add to conversation history
-        active_conversations[session_id].append({
+        active_sessions[session_id]["conversation_history"].append({
             "role": "assistant",
             "content": greeting_text
         })
         
-        logger.info(f"👋 Generated greeting for session {session_id}")
+        logger.info(f"👋 Generated {request.interviewer_type} greeting for {request.candidate_name}")
         
         return {
             "session_id": session_id,
             "text": greeting_text,
+            "candidate_name": request.candidate_name,
+            "interviewer_type": request.interviewer_type,
             "message": "Interview session started"
         }
         
@@ -72,7 +93,7 @@ async def get_audio(session_id: str, text: str):
         Streaming audio response (MP3)
     """
     try:
-        if session_id not in active_conversations:
+        if session_id not in active_sessions:
             raise HTTPException(status_code=404, detail="Session not found")
         
         logger.info(f"🔊 Generating audio for session {session_id}")
@@ -133,11 +154,13 @@ async def process_audio_response(
         language: Language code (default: "fr")
         
     Returns:
-        JSON with transcription, LLM response text
+        JSON with transcription, LLM response text, and question count
     """
     try:
-        if session_id not in active_conversations:
+        if session_id not in active_sessions:
             raise HTTPException(status_code=404, detail="Session not found")
+        
+        session = active_sessions[session_id]
         
         logger.info(f"🎤 Processing audio for session {session_id}")
         
@@ -157,17 +180,21 @@ async def process_audio_response(
             
             logger.info(f"✅ Transcription: {transcribed_text}")
             
-            # Step 2: Get LLM response
-            logger.info("🔄 Getting LLM response...")
+            # Increment question count
+            session["question_count"] += 1
+            
+            # Step 2: Get LLM response with interviewer personality
+            logger.info(f"🔄 Getting {session['interviewer_type']} interviewer response...")
             llm_response = await llm_service.chat(
                 transcribed_text,
-                active_conversations[session_id]
+                session["conversation_history"],
+                session["interviewer_type"]
             )
             
             logger.info(f"✅ LLM response: {llm_response[:100]}...")
             
             # Step 3: Update conversation history
-            active_conversations[session_id].extend([
+            session["conversation_history"].extend([
                 {"role": "user", "content": transcribed_text},
                 {"role": "assistant", "content": llm_response}
             ])
@@ -175,7 +202,9 @@ async def process_audio_response(
             return {
                 "transcription": transcribed_text,
                 "response": llm_response,
-                "session_id": session_id
+                "session_id": session_id,
+                "question_count": session["question_count"],
+                "interviewer_type": session["interviewer_type"]
             }
             
         finally:
@@ -205,24 +234,35 @@ async def end_interview(session_id: str):
         JSON with summary text
     """
     try:
-        if session_id not in active_conversations:
+        if session_id not in active_sessions:
             raise HTTPException(status_code=404, detail="Session not found")
+        
+        session = active_sessions[session_id]
         
         logger.info(f"👋 Ending interview session {session_id}")
         
-        # Get final summary
+        # Get final summary with personality
         summary = await llm_service.end_interview(
-            active_conversations[session_id]
+            session["conversation_history"],
+            session["interviewer_type"]
         )
         
+        # Get session info before cleanup
+        candidate_name = session["candidate_name"]
+        interviewer_type = session["interviewer_type"]
+        question_count = session["question_count"]
+        
         # Clean up session
-        del active_conversations[session_id]
+        del active_sessions[session_id]
         
         logger.info(f"✅ Interview ended: {session_id}")
         
         return {
             "summary": summary,
-            "session_id": session_id
+            "session_id": session_id,
+            "candidate_name": candidate_name,
+            "interviewer_type": interviewer_type,
+            "question_count": question_count
         }
         
     except HTTPException:
@@ -241,21 +281,57 @@ async def get_conversation_history(session_id: str):
         session_id: Session identifier
         
     Returns:
-        JSON with conversation history
+        JSON with conversation history and session details
     """
     try:
-        if session_id not in active_conversations:
+        if session_id not in active_sessions:
             raise HTTPException(status_code=404, detail="Session not found")
+        
+        session = active_sessions[session_id]
         
         return {
             "session_id": session_id,
-            "history": active_conversations[session_id]
+            "candidate_name": session["candidate_name"],
+            "interviewer_type": session["interviewer_type"],
+            "question_count": session["question_count"],
+            "history": session["conversation_history"]
         }
         
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"❌ Error getting history: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/interview/{session_id}/info")
+async def get_session_info(session_id: str):
+    """
+    Get session information without full history.
+    
+    Args:
+        session_id: Session identifier
+        
+    Returns:
+        JSON with session details
+    """
+    try:
+        if session_id not in active_sessions:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        session = active_sessions[session_id]
+        
+        return {
+            "session_id": session_id,
+            "candidate_name": session["candidate_name"],
+            "interviewer_type": session["interviewer_type"],
+            "question_count": session["question_count"]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error getting session info: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -271,10 +347,10 @@ async def delete_session(session_id: str):
         Success message
     """
     try:
-        if session_id not in active_conversations:
+        if session_id not in active_sessions:
             raise HTTPException(status_code=404, detail="Session not found")
         
-        del active_conversations[session_id]
+        del active_sessions[session_id]
         
         logger.info(f"🗑️ Deleted session: {session_id}")
         
