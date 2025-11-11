@@ -3,6 +3,7 @@ from groq import Groq
 import edge_tts
 from typing import AsyncGenerator
 import logging
+import io
 
 from app.core.config import settings
 
@@ -73,14 +74,16 @@ class VoiceService:
     async def text_to_speech_stream(
         self, 
         text: str, 
-        voice: str = None
+        voice: str = None,
+        chunk_size: int = 8192  # Increased chunk size for smoother playback
     ) -> AsyncGenerator[bytes, None]:
         """
-        Convert text to speech using Edge TTS and stream the audio.
+        Convert text to speech using Edge TTS and stream the audio in larger chunks.
         
         Args:
             text: Text to convert to speech
             voice: Voice to use (defaults to settings.TTS_VOICE)
+            chunk_size: Size of audio chunks to yield (in bytes)
             
         Yields:
             Audio chunks as bytes
@@ -91,6 +94,7 @@ class VoiceService:
         
         logger.info(f"🔊 Starting TTS with voice: {voice}")
         logger.info(f"📝 Text: '{text[:100]}...'")
+        logger.info(f"📦 Chunk size: {chunk_size} bytes")
         
         try:
             communicate = edge_tts.Communicate(
@@ -100,11 +104,27 @@ class VoiceService:
                 volume=settings.TTS_VOLUME
             )
             
+            buffer = io.BytesIO()
             chunk_count = 0
+            
             async for chunk in communicate.stream():
                 if chunk["type"] == "audio":
-                    chunk_count += 1
-                    yield chunk["data"]
+                    # Write to buffer
+                    buffer.write(chunk["data"])
+                    
+                    # When buffer reaches chunk_size, yield it
+                    if buffer.tell() >= chunk_size:
+                        chunk_count += 1
+                        buffer.seek(0)
+                        data = buffer.read()
+                        yield data
+                        buffer = io.BytesIO()  # Reset buffer
+            
+            # Yield any remaining data in buffer
+            if buffer.tell() > 0:
+                chunk_count += 1
+                buffer.seek(0)
+                yield buffer.read()
             
             logger.info(f"✅ TTS complete: {chunk_count} audio chunks")
             
