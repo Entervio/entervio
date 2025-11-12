@@ -1,19 +1,34 @@
-# app/main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.db import engine, Base
 from app.core.config import settings
 from app.api.v1.router import api_router
 
+import logging
+
+# Import all models to ensure they're registered with Base
+from app.models.interview import Interview
+from app.models.question_answer import QuestionAnswer
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Create database tables
+logger.info("🔄 Creating database tables...")
+Base.metadata.create_all(bind=engine)
+logger.info("✅ Database tables created!")
+
 app = FastAPI(
-    title="Interview Practice Platform API",
-    description="API for AI-powered interview practice",
+    title="Voice Interview API",
+    description="AI-powered voice interview system",
     version="1.0.0"
 )
 
-# CORS middleware for React frontend
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_origins=["*"],  # In production, specify your frontend domain
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -24,13 +39,9 @@ app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/")
-async def root():
-    return {
-        "message": "Welcome to Interview Practice Platform API",
-        "status": "running",
-        "docs": "/docs"
-    }
+def read_root():
+    return {"message": "Welcome to Voice Interview API", "status": "running"}
 
 @app.get("/health")
-async def health_check():
+def health_check():
     return {"status": "healthy"}

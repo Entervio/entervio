@@ -51,13 +51,18 @@ const interviewerOptions: InterviewerOption[] = [
   },
 ];
 
+const API_BASE_URL = `http://${window.location.hostname}:8000/api/v1/voice`;
+
 export default function Setup() {
   const navigate = useNavigate();
   const [candidateName, setCandidateName] = useState("");
-  const [selectedInterviewer, setSelectedInterviewer] = useState<InterviewerType | null>(null);
+  const [selectedInterviewer, setSelectedInterviewer] = useState<InterviewerType | null>(
+    null
+  );
   const [error, setError] = useState<string | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
 
-  const handleStart = () => {
+  const handleStart = async () => {
     // Validation
     if (!candidateName.trim()) {
       setError("Veuillez entrer votre nom");
@@ -69,13 +74,35 @@ export default function Setup() {
       return;
     }
 
-    // Navigate to interview with parameters
-    navigate("/interview", {
-      state: {
-        candidateName: candidateName.trim(),
-        interviewerType: selectedInterviewer,
-      },
-    });
+    setIsStarting(true);
+    setError(null);
+
+    try {
+      // Create interview via API
+      const response = await fetch(`${API_BASE_URL}/interview/start`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          candidate_name: candidateName.trim(),
+          interviewer_type: selectedInterviewer,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Navigate to interview with the session_id as the URL parameter
+      navigate(`/interview/${data.session_id}`);
+    } catch (err) {
+      console.error("Error starting interview:", err);
+      setError("Impossible de démarrer l'entretien. Veuillez réessayer.");
+      setIsStarting(false);
+    }
   };
 
   return (
@@ -112,6 +139,7 @@ export default function Setup() {
               placeholder="Entrez votre nom"
               className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-indigo-500 focus:outline-none transition-colors text-lg"
               autoFocus
+              disabled={isStarting}
             />
           </div>
 
@@ -128,16 +156,21 @@ export default function Setup() {
                     setSelectedInterviewer(option.type);
                     setError(null);
                   }}
-                  className={`p-6 rounded-xl border-2 transition-all duration-200 text-left hover:scale-105 ${
+                  disabled={isStarting}
+                  className={`p-6 rounded-xl border-2 transition-all duration-200 text-left hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${
                     selectedInterviewer === option.type
                       ? `${option.borderColor} ${option.bgColor} shadow-lg`
                       : "border-gray-200 hover:border-gray-300"
                   }`}
                 >
                   <div className="text-4xl mb-3">{option.icon}</div>
-                  <h3 className={`text-xl font-bold mb-2 ${
-                    selectedInterviewer === option.type ? option.color : "text-gray-800"
-                  }`}>
+                  <h3
+                    className={`text-xl font-bold mb-2 ${
+                      selectedInterviewer === option.type
+                        ? option.color
+                        : "text-gray-800"
+                    }`}
+                  >
                     {option.label}
                   </h3>
                   <p className="text-sm text-gray-600 leading-relaxed">
@@ -158,24 +191,51 @@ export default function Setup() {
           {/* Start Button */}
           <button
             onClick={handleStart}
-            disabled={!candidateName.trim() || !selectedInterviewer}
+            disabled={!candidateName.trim() || !selectedInterviewer || isStarting}
             className="w-full py-4 px-6 rounded-xl font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:bg-indigo-600"
           >
             <div className="flex items-center justify-center gap-2">
-              <span className="text-lg">Commencer l'entretien</span>
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 7l5 5m0 0l-5 5m5-5H6"
-                />
-              </svg>
+              {isStarting ? (
+                <>
+                  <svg
+                    className="animate-spin w-6 h-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  <span>Démarrage...</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-lg">Commencer l'entretien</span>
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 7l5 5m0 0l-5 5m5-5H6"
+                    />
+                  </svg>
+                </>
+              )}
             </div>
           </button>
         </div>
@@ -198,17 +258,19 @@ export default function Setup() {
               Microphone requis
             </h3>
             <p className="text-gray-600 text-sm">
-              Autorisez l'accès à votre microphone pour répondre vocalement aux questions.
+              Autorisez l'accès à votre microphone pour répondre vocalement aux
+              questions.
             </p>
           </div>
 
           <div className="bg-white rounded-xl shadow p-6">
             <h3 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
-              <span className="text-2xl">🔒</span>
-              Confidentialité
+              <span className="text-2xl">💾</span>
+              Sauvegarde
             </h3>
             <p className="text-gray-600 text-sm">
-              Vos réponses ne sont pas enregistrées. Ceci est un outil de pratique.
+              Votre entretien est sauvegardé. Vous pouvez y revenir avec le lien de
+              session.
             </p>
           </div>
 
@@ -218,7 +280,8 @@ export default function Setup() {
               Conseil
             </h3>
             <p className="text-gray-600 text-sm">
-              Répondez naturellement et prenez votre temps. Il n'y a pas de mauvaises réponses.
+              Répondez naturellement et prenez votre temps. Il n'y a pas de mauvaises
+              réponses.
             </p>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { useParams, useNavigate } from "react-router";
 import type { Route } from "./+types/interview";
 
 export function meta({}: Route.MetaArgs) {
@@ -27,14 +27,12 @@ const interviewerLabels = {
 };
 
 export default function Interview() {
-  const location = useLocation();
+  const { interviewId } = useParams();
   const navigate = useNavigate();
-  
-  // Get candidate info from navigation state
-  const candidateName = location.state?.candidateName as string;
-  const interviewerType = location.state?.interviewerType as InterviewerType;
 
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [candidateName, setCandidateName] = useState<string>("");
+  const [interviewerType, setInterviewerType] = useState<InterviewerType>("neutral");
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [interviewStarted, setInterviewStarted] = useState(false);
@@ -42,75 +40,93 @@ export default function Interview() {
   const [error, setError] = useState<string | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [questionCount, setQuestionCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Redirect if missing required data
+  // Load interview data on mount
   useEffect(() => {
-    if (!candidateName || !interviewerType) {
-      navigate("/setup");
+    if (interviewId) {
+      loadInterviewData();
+    } else {
+      navigate("/");
     }
-  }, [candidateName, interviewerType, navigate]);
+  }, [interviewId, navigate]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Start interview on component mount
-  useEffect(() => {
-    if (candidateName && interviewerType) {
-      startInterview();
-    }
-  }, [candidateName, interviewerType]);
-
-  const startInterview = async () => {
+  const loadInterviewData = async () => {
     try {
-      setIsProcessing(true);
+      setIsLoading(true);
       setError(null);
 
-      const response = await fetch(`${API_BASE_URL}/interview/start`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          candidate_name: candidateName,
-          interviewer_type: interviewerType,
-        }),
-      });
+      // Get session info
+      const response = await fetch(`${API_BASE_URL}/interview/${interviewId}/info`);
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          setError("Session non trouvée. Redirection...");
+          setTimeout(() => navigate("/"), 2000);
+          return;
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      setSessionId(data.session_id);
+      setCandidateName(data.candidate_name);
+      setInterviewerType(data.interviewer_style);
+      setQuestionCount(data.question_count);
+      setInterviewStarted(true);
+
+      // Load conversation history
+      await loadConversationHistory();
+
+      setIsLoading(false);
+    } catch (err) {
+      console.error("Error loading interview:", err);
+      setError("Impossible de charger l'entretien.");
+      setIsLoading(false);
+    }
+  };
+
+  const loadConversationHistory = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/interview/${interviewId}/history`);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      
-      setSessionId(data.session_id);
-      setInterviewStarted(true);
 
-      // Add greeting message
-      const greetingMessage: Message = {
-        id: Date.now().toString(),
-        role: "assistant",
-        text: data.text,
+      // Convert history to messages
+      const loadedMessages: Message[] = data.history.map((msg: any, index: number) => ({
+        id: `${Date.now()}-${index}`,
+        role: msg.role === "assistant" ? "assistant" : "user",
+        text: msg.content,
         timestamp: new Date(),
-      };
-      
-      setMessages([greetingMessage]);
+      }));
 
-      // Play greeting audio
-      await playAudio(data.session_id, data.text);
+      setMessages(loadedMessages);
 
-      setIsProcessing(false);
-      
+      // Play the last assistant message if it exists
+      if (loadedMessages.length > 0) {
+        const lastMessage = loadedMessages[loadedMessages.length - 1];
+        if (lastMessage.role === "assistant" && interviewId) {
+          await playAudio(interviewId, lastMessage.text);
+        }
+      }
     } catch (err) {
-      console.error("Error starting interview:", err);
-      setError("Impossible de démarrer l'entretien. Veuillez réessayer.");
-      setIsProcessing(false);
+      console.error("Error loading conversation history:", err);
+      // Don't show error - history is optional
     }
   };
 
@@ -128,7 +144,7 @@ export default function Interview() {
       const audio = new Audio(
         `${API_BASE_URL}/interview/${sid}/audio?text=${encodeURIComponent(text)}`
       );
-      
+
       currentAudioRef.current = audio;
 
       // Play audio
@@ -146,7 +162,6 @@ export default function Interview() {
           reject(e);
         };
       });
-
     } catch (err) {
       console.error("Error playing audio:", err);
       setIsPlayingAudio(false);
@@ -178,7 +193,6 @@ export default function Interview() {
       mediaRecorderRef.current = mediaRecorder;
       setIsRecording(true);
       setError(null);
-      
     } catch (err) {
       console.error("Microphone error:", err);
       setError("Impossible d'accéder au microphone. Veuillez autoriser l'accès.");
@@ -245,10 +259,11 @@ export default function Interview() {
       setMessages((prev) => [...prev, userMessage, assistantMessage]);
 
       // Play response audio
-      await playAudio(sessionId, data.response);
+      if (sessionId) {
+        await playAudio(sessionId, data.response);
+      }
 
       setIsProcessing(false);
-      
     } catch (err) {
       console.error("Error processing recording:", err);
       setError("Erreur lors du traitement de votre réponse. Veuillez réessayer.");
@@ -286,11 +301,12 @@ export default function Interview() {
       setMessages((prev) => [...prev, summaryMessage]);
 
       // Play summary audio
-      await playAudio(sessionId, data.summary);
+      if (sessionId) {
+        await playAudio(sessionId, data.summary);
+      }
 
       setInterviewStarted(false);
       setIsProcessing(false);
-      
     } catch (err) {
       console.error("Error ending interview:", err);
       setError("Erreur lors de la fin de l'entretien.");
@@ -304,16 +320,64 @@ export default function Interview() {
       currentAudioRef.current.pause();
       currentAudioRef.current = null;
     }
-    
+
     // Navigate back to setup
-    navigate("/setup");
+    navigate("/");
   };
 
-  if (!candidateName || !interviewerType) {
-    return null; // Will redirect via useEffect
+  // Handle loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <svg
+            className="animate-spin w-16 h-16 mx-auto mb-4 text-indigo-600"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            />
+          </svg>
+          <p className="text-lg text-gray-600">Chargement de l'entretien...</p>
+        </div>
+      </div>
+    );
   }
 
-  const interviewerInfo = interviewerLabels[interviewerType];
+  // Handle missing data
+  if (!interviewId || !sessionId || !candidateName) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center bg-white rounded-2xl shadow-lg p-8 max-w-md">
+          <div className="text-6xl mb-4">❌</div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Session introuvable</h2>
+          <p className="text-gray-600 mb-6">
+            Cette session d'entretien n'existe pas ou a expiré.
+          </p>
+          <button
+            onClick={() => navigate("/")}
+            className="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors"
+          >
+            Retour à l'accueil
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Get interviewer info (with fallback)
+  const interviewerInfo = interviewerLabels[interviewerType] || interviewerLabels.neutral;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100">
@@ -332,6 +396,9 @@ export default function Interview() {
                   <span className="text-lg">{interviewerInfo.icon}</span>
                   <span className="font-medium">{interviewerInfo.name}</span>
                 </div>
+              </div>
+              <div className="mt-2 text-xs text-gray-500 font-mono">
+                ID: {interviewId}
               </div>
             </div>
             <div className="flex flex-col items-end gap-2">
@@ -394,9 +461,9 @@ export default function Interview() {
                   d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
                 />
               </svg>
-              <p className="text-lg font-medium">Démarrage de l'entretien...</p>
+              <p className="text-lg font-medium">Chargement de l'entretien...</p>
               <p className="text-sm text-center mt-2">
-                Le recruteur {interviewerInfo.name.toLowerCase()} prépare votre accueil
+                Le recruteur {interviewerInfo.name.toLowerCase()} vous attend
               </p>
             </div>
           ) : (
@@ -412,13 +479,16 @@ export default function Interview() {
                     className={`max-w-[80%] rounded-2xl px-6 py-3 ${
                       message.role === "user"
                         ? "bg-indigo-600 text-white"
-                        : `${interviewerInfo.bg} text-gray-800 border-2 ${interviewerInfo.color.replace('text-', 'border-')}`
+                        : `${interviewerInfo.bg} text-gray-800 border-2 ${interviewerInfo.color.replace(
+                            "text-",
+                            "border-"
+                          )}`
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs font-medium opacity-75">
-                        {message.role === "user" 
-                          ? `👤 ${candidateName}` 
+                        {message.role === "user"
+                          ? `👤 ${candidateName}`
                           : `${interviewerInfo.icon} Recruteur`}
                       </span>
                       <span className="text-xs opacity-50">
@@ -428,7 +498,9 @@ export default function Interview() {
                         })}
                       </span>
                     </div>
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                      {message.text}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -443,7 +515,9 @@ export default function Interview() {
             {/* Record Button */}
             <button
               onClick={isRecording ? stopRecording : startRecording}
-              disabled={!sessionId || isProcessing || !interviewStarted || isPlayingAudio}
+              disabled={
+                !sessionId || isProcessing || !interviewStarted || isPlayingAudio
+              }
               className={`flex-1 py-4 px-6 rounded-xl font-semibold text-white transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${
                 isRecording
                   ? "bg-red-500 hover:bg-red-600 animate-pulse"
@@ -496,11 +570,21 @@ export default function Interview() {
             {/* End Interview Button */}
             <button
               onClick={endInterview}
-              disabled={!sessionId || !interviewStarted || messages.length < 2 || isProcessing}
+              disabled={
+                !sessionId ||
+                !interviewStarted ||
+                messages.length < 2 ||
+                isProcessing
+              }
               className="sm:w-auto px-6 py-4 rounded-xl font-semibold text-white bg-purple-600 hover:bg-purple-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="flex items-center justify-center gap-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -519,7 +603,12 @@ export default function Interview() {
                 className="sm:w-auto px-6 py-4 rounded-xl font-semibold text-white bg-green-600 hover:bg-green-700 transition-all duration-200"
               >
                 <div className="flex items-center justify-center gap-2">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -534,20 +623,23 @@ export default function Interview() {
           </div>
 
           {/* Instructions */}
-          <div className={`mt-4 p-4 rounded-lg border-2 ${interviewerInfo.bg} ${interviewerInfo.color.replace('text-', 'border-')}`}>
+          <div
+            className={`mt-4 p-4 rounded-lg border-2 ${interviewerInfo.bg} ${interviewerInfo.color.replace(
+              "text-",
+              "border-"
+            )}`}
+          >
             <p className="text-sm text-gray-700">
-              <strong>💡 Instructions :</strong> Attendez que le recruteur termine sa question 
-              (l'audio doit finir de jouer), puis cliquez sur "Répondre" pour parler. 
-              Cliquez sur "Arrêter" quand vous avez fini de parler.
+              <strong>💡 Instructions :</strong> Attendez que le recruteur termine sa
+              question (l'audio doit finir de jouer), puis cliquez sur "Répondre" pour
+              parler. Cliquez sur "Arrêter" quand vous avez fini de parler.
             </p>
           </div>
         </div>
 
         {/* Footer Info */}
         <div className="mt-6 text-center text-sm text-gray-600">
-          <p>
-            🤖 Propulsé par Groq Whisper • Google Gemini • Edge TTS
-          </p>
+          <p>🤖 Propulsé par Groq Whisper • Google Gemini • Edge TTS</p>
           <p className="mt-1 text-xs">
             Simulation d'entretien 100% IA pour améliorer vos compétences
           </p>
