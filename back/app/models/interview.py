@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Enum
+from sqlalchemy import Column, Integer, String, Enum, Text
 from sqlalchemy.orm import relationship
 import enum
 from app.db import Base
@@ -14,6 +14,8 @@ class Interview(Base):
     id = Column(Integer, primary_key=True, index=True)
     interviewee_name = Column(String, nullable=False)
     interviewer_style = Column(Enum(InterviewerStyle), nullable=False)
+    question_count = Column(Integer, nullable=False, default=1)
+    global_feedback = Column(Text, nullable=True)
     
     # Relationship to question_answers
     question_answers = relationship(

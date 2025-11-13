@@ -3,6 +3,7 @@ import google.generativeai as genai
 from typing import List, Dict, Literal
 import logging
 from app.core.config import settings
+import json
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -126,6 +127,17 @@ class LLMService:
             'gemini-2.5-flash',
             system_instruction=system_prompt
         )
+
+    def _create_grading_model(self, interviewer_type: InterviewerType):
+        """Create a gemini model to grade the user responses"""
+        system_prompt = get_system_prompt(interviewer_type)
+        return genai.GenerativeModel(
+            'gemini-2.5-flash',
+            system_instruction=system_prompt,
+            generation_config={
+                "response_mime_type": "application/json"
+            }
+        )
     
     def get_initial_greeting(
         self, 
@@ -219,6 +231,70 @@ Présentez-vous. Et soyez synthétique."""
             logger.error(f"❌ Chat error: {str(e)}")
             raise
     
+    async def grade_response(
+    self,
+    question: str,
+    answer: str,
+    interviewer_type: InterviewerType
+    ) -> Dict[str, any]:
+        """
+        Grade a candidate's response to an interview question.
+        
+        Args:
+            question: The interview question asked
+            answer: The candidate's answer
+            interviewer_type: Type of interviewer (affects grading strictness)
+            
+        Returns:
+            Dict with 'grade' (1-10) and 'feedback' (str)
+        """
+        logger.info(f"📊 Grading response with {interviewer_type} interviewer...")
+        
+        try:
+            # Create grading model with JSON output
+            model = self._create_grading_model(interviewer_type)
+            
+            # Grading prompt with strict JSON schema
+            grading_prompt = f"""Tu dois évaluer la réponse d'un candidat à une question d'entretien.
+
+                                QUESTION POSÉE:
+                                {question}
+
+                                RÉPONSE DU CANDIDAT:
+                                {answer}
+
+                                CONSIGNES D'ÉVALUATION:
+                                - Note de 1 à 10 (1 = très mauvais, 10 = excellent)
+                                - Feedback concis en français (2-3 phrases maximum)
+                                - Évalue: pertinence, clarté, exemples concrets, structure
+
+                                Réponds UNIQUEMENT avec ce format JSON exact:
+                                {{
+                                "grade": 8,
+                                "feedback": "Réponse claire avec un bon exemple. Manque de chiffres précis."
+                                }}"""
+
+            # Generate response
+            response = model.generate_content(grading_prompt)
+            
+            # Parse JSON response
+            result = json.loads(response.text)
+            
+            logger.info(f"✅ Response graded: {result['grade']}/10")
+            return result
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"❌ Failed to parse JSON response: {str(e)}")
+            logger.error(f"Raw response: {response.text}")
+            # Fallback response
+            return {
+                "grade": 5,
+                "feedback": "Erreur lors de l'évaluation de la réponse."
+            }
+        except Exception as e:
+            logger.error(f"❌ Grading error: {str(e)}")
+            raise
+
     async def end_interview(
         self, 
         conversation_history: List[Dict[str, str]],

@@ -115,6 +115,7 @@ class InterviewService:
                 language=language
             )
             logger.info(f"✅ Transcription: {transcribed_text}")
+
             
             # Step 2: Update the last question with the user's answer
             # Get the last question-answer pair (which should have answer=None)
@@ -124,6 +125,10 @@ class InterviewService:
             else:
                 # If no pending question, log a warning but continue
                 logger.warning(f"⚠️ No pending question found for interview {interview_id}")
+
+            grade = await self.llm_service.grade_response(last_qa.question, transcribed_text, interview.interviewer_style)
+            last_qa.feedback = grade["feedback"]
+            last_qa.grade = int(grade["grade"])
             
             # Step 3: Build conversation history from database
             conversation_history = self._build_conversation_history(interview)
@@ -137,23 +142,21 @@ class InterviewService:
             )
             logger.info(f"✅ LLM response: {llm_response[:100]}...")
             
-            # Step 5: Save new question with pending answer
             qa = QuestionAnswer(
                 question=llm_response,  # LLM's next question
                 answer=None,  # User's response will be added in next interaction
                 interview_id=interview.id
             )
+            interview.question_count = interview.question_count + 1
+
             db.add(qa)
             db.commit()
-            
-            # Calculate question count (total questions asked by LLM)
-            question_count = len(interview.question_answers)
             
             return {
                 "transcription": transcribed_text,
                 "response": llm_response,
                 "session_id": str(interview_id),
-                "question_count": question_count,
+                "question_count": interview.question_count,
                 "interviewer_style": interview.interviewer_style
             }
             
@@ -198,21 +201,12 @@ class InterviewService:
                 conversation_history,
                 interview.interviewer_style
             )
+
+            interview.global_feedback = summary
+
+            interview.question_count = interview.question_count + 1
             
-            # Save summary as final question-answer pair
-            summary_qa = QuestionAnswer(
-                question="[SUMMARY]",  # Special marker for summary
-                answer=summary,  # Summary is the answer here (exception to the rule)
-                interview_id=interview.id
-            )
-            db.add(summary_qa)
             db.commit()
-            
-            # Calculate question count (exclude SUMMARY)
-            question_count = sum(
-                1 for qa in interview.question_answers 
-                if qa.question != "[SUMMARY]"
-            )
             
             logger.info(f"✅ Interview ended: {interview_id}")
             
@@ -222,7 +216,7 @@ class InterviewService:
                 "interview_id": interview_id,
                 "candidate_name": interview.interviewee_name,
                 "interviewer_style": interview.interviewer_style,
-                "question_count": question_count
+                "question_count": interview.question_count
             }
             
         except Exception as e:
