@@ -1,12 +1,14 @@
 """Interview Service - Business logic for managing interviews"""
 from typing import Dict, Optional
 import logging
+import asyncio
 from sqlalchemy.orm import Session
 
 from app.models.interview import Interview, InterviewerStyle
 from app.models.question_answer import QuestionAnswer
 from app.services.llm_service import llm_service
 from app.services.voice_service import voice_service
+from app.services.grading_service import grading_service
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +21,7 @@ class InterviewService:
         logger.info("🔄 Initializing InterviewService...")
         self.llm_service = llm_service
         self.voice_service = voice_service
+        self.grading_service = grading_service
         logger.info("✅ InterviewService initialized!")
     
     async def start_interview(
@@ -122,14 +125,11 @@ class InterviewService:
             last_qa = interview.question_answers[-1] if interview.question_answers else None
             if last_qa and last_qa.answer is None:
                 last_qa.answer = transcribed_text
+                db.flush()  # Flush to get the ID if needed
             else:
                 # If no pending question, log a warning but continue
                 logger.warning(f"⚠️ No pending question found for interview {interview_id}")
 
-            grade = await self.llm_service.grade_response(last_qa.question, transcribed_text, interview.interviewer_style)
-            last_qa.feedback = grade["feedback"]
-            last_qa.grade = int(grade["grade"])
-            
             # Step 3: Build conversation history from database
             conversation_history = self._build_conversation_history(interview)
             
@@ -142,6 +142,7 @@ class InterviewService:
             )
             logger.info(f"✅ LLM response: {llm_response[:100]}...")
             
+            # Step 5: Create new question-answer record
             qa = QuestionAnswer(
                 question=llm_response,  # LLM's next question
                 answer=None,  # User's response will be added in next interaction
@@ -151,6 +152,20 @@ class InterviewService:
 
             db.add(qa)
             db.commit()
+            
+            # Step 6: Trigger background grading (non-blocking)
+            # This will run asynchronously and update the database when complete
+            if last_qa and last_qa.answer:
+                asyncio.create_task(
+                    self.grading_service.grade_and_update(
+                        db=db,
+                        qa_id=last_qa.id,
+                        question=last_qa.question,
+                        answer=last_qa.answer,
+                        interviewer_style=interview.interviewer_style
+                    )
+                )
+                logger.info(f"🚀 Background grading task started for QA {last_qa.id}")
             
             return {
                 "transcription": transcribed_text,
