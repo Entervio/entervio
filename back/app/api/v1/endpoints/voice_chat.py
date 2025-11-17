@@ -201,3 +201,10 @@ async def delete_session(interview_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"❌ Error deleting session: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("interview/{interview_id}/summary")
+async def get_interview_summary(interview_id: int, db: Session = Depends(get_db)):
+    try:
+        return interview_service.get_interview_summary(db, interview_id)
+    except:
+        raise

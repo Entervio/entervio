@@ -3,6 +3,7 @@ from typing import Dict, Optional
 import logging
 import asyncio
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from app.models.interview import Interview, InterviewerStyle
 from app.models.question_answer import QuestionAnswer
@@ -321,6 +322,22 @@ class InterviewService:
         logger.info(f"🗑️ Deleted interview: {interview_id}")
         return True
     
+    def get_interview_summary(self, db: Session, interview_id: int) -> Optional[Dict]:
+        """
+        Get the summary of the interview
+
+        Args:
+            db: Databse session
+            interview_id: Interview identifier
+
+        Returns:
+            A JSON Object containing the general feedback
+        """
+
+        interview = db.query(Interview).filter(Interview.id == interview_id).first()
+
+        return interview.question_answers 
+    
     def _build_conversation_history(self, interview: Interview) -> list:
         """
         Build conversation history from interview question_answers.
@@ -335,17 +352,11 @@ class InterviewService:
         history = []
         
         for qa in interview.question_answers:
-            # Skip summary marker
-            if qa.question == "[SUMMARY]":
-                continue
-            
-            # Add LLM's question as assistant message
             history.append({
                 "role": "assistant",
                 "content": qa.question
             })
-            
-            # Add user's answer if provided
+
             if qa.answer:
                 history.append({
                     "role": "user",
