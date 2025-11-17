@@ -1,4 +1,3 @@
-// app/routes/account.tsx
 import type { Route } from "./+types/account";
 import { Layout } from "~/components/layout/Layout";
 import { Card, CardContent } from "~/components/ui/card";
