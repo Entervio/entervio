@@ -325,18 +325,34 @@ class InterviewService:
     def get_interview_summary(self, db: Session, interview_id: int) -> Optional[Dict]:
         """
         Get the summary of the interview
-
         Args:
-            db: Databse session
+            db: Database session
             interview_id: Interview identifier
-
         Returns:
-            A JSON Object containing the general feedback
+            A JSON Object containing the general feedback, as well as each question answer pair with
+            its individual feedback
         """
-
         interview = db.query(Interview).filter(Interview.id == interview_id).first()
-
-        return interview.question_answers 
+        
+        if not interview:
+            return None
+        
+        # Build the summary dictionary
+        summary = {
+            "feedback": interview.global_feedback,
+            "questions": []
+        }
+        
+        # Loop over question_answers and append each Q&A with feedback
+        for qa in interview.question_answers:
+            summary["questions"].append({
+                "question": qa.question,
+                "answer": qa.answer,
+                "grade": qa.grade,
+                "feedback": qa.feedback
+            })
+        
+        return summary
     
     def _build_conversation_history(self, interview: Interview) -> list:
         """
