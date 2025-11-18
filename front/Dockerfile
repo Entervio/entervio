@@ -1,22 +1,28 @@
-FROM node:20-alpine AS development-dependencies-env
-COPY . /app
+FROM node:20-alpine
+
 WORKDIR /app
+
+# Copy package files
+COPY package.json package-lock.json ./
+
+# Install all dependencies (including dev for building)
 RUN npm ci
 
-FROM node:20-alpine AS production-dependencies-env
-COPY ./package.json package-lock.json /app/
-WORKDIR /app
-RUN npm ci --omit=dev
+# Copy source code
+COPY . .
 
-FROM node:20-alpine AS build-env
-COPY . /app/
-COPY --from=development-dependencies-env /app/node_modules /app/node_modules
-WORKDIR /app
+# Build the application
 RUN npm run build
 
-FROM node:20-alpine
-COPY ./package.json package-lock.json /app/
-COPY --from=production-dependencies-env /app/node_modules /app/node_modules
-COPY --from=build-env /app/build /app/build
-WORKDIR /app
+# DEBUG: Show what was actually built
+RUN echo "=== Contents of /app ===" && ls -la /app
+RUN echo "=== Contents of /app/build ===" && ls -la /app/build || echo "No build directory!"
+RUN echo "=== Contents of /app/build/server ===" && ls -la /app/build/server || echo "No build/server directory!"
+RUN echo "=== Contents of /app/build/client ===" && ls -la /app/build/client || echo "No build/client directory!"
+
+# Remove dev dependencies
+RUN npm prune --omit=dev
+
+EXPOSE 3000
+
 CMD ["npm", "run", "start"]
