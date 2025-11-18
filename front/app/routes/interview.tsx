@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router";
 import type { Route } from "./+types/interview";
 import { Layout } from "~/components/layout/Layout";
@@ -6,10 +6,9 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { Alert, AlertDescription } from "~/components/ui/alert";
 import { Badge } from "~/components/ui/badge";
-import { interviewApi, ApiError } from "~/lib/api";
 import { INTERVIEWER_LABELS } from "~/types/interview";
-import type { InterviewerType, Message } from "~/types/interview";
 import { cn } from "~/lib/utils";
+import { useInterviewStore } from "~/services/useinterviewstore";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -21,235 +20,59 @@ export function meta({}: Route.MetaArgs) {
 export default function Interview() {
   const { interviewId } = useParams();
   const navigate = useNavigate();
-
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [candidateName, setCandidateName] = useState<string>("");
-  const [interviewerType, setInterviewerType] =
-    useState<InterviewerType>("neutral");
-  const [isRecording, setIsRecording] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [interviewStarted, setInterviewStarted] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
-  const [questionCount, setQuestionCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Get state and actions from store
+  const {
+    sessionId,
+    candidateName,
+    interviewerType,
+    isRecording,
+    isProcessing,
+    interviewStarted,
+    messages,
+    error,
+    isPlayingAudio,
+    questionCount,
+    isLoading,
+    loadInterviewData,
+    startRecording,
+    stopRecording,
+    endInterview,
+    setError,
+    cleanup,
+    reset,
+  } = useInterviewStore();
+
+  // Load interview data on mount
   useEffect(() => {
     if (interviewId) {
-      loadInterviewData();
+      loadInterviewData(interviewId).then((success) => {
+        if (!success) {
+          setTimeout(() => navigate("/"), 2000);
+        }
+      });
     } else {
       navigate("/");
     }
-  }, [interviewId, navigate]);
 
+    // Cleanup on unmount
+    return () => {
+      cleanup();
+    };
+  }, [interviewId, navigate, loadInterviewData, cleanup]);
+
+  // Auto-scroll messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const loadInterviewData = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      const data = await interviewApi.getInterviewInfo(interviewId!);
-
-      setSessionId(data.session_id);
-      setCandidateName(data.candidate_name);
-      setInterviewerType(data.interviewer_style);
-      setQuestionCount(data.question_count);
-      setInterviewStarted(true);
-
-      await loadConversationHistory();
-
-      setIsLoading(false);
-    } catch (err) {
-      console.error("Error loading interview:", err);
-      if (err instanceof ApiError && err.status === 404) {
-        setError("Session non trouvée. Redirection...");
-        setTimeout(() => navigate("/"), 2000);
-      } else {
-        setError("Impossible de charger l'entretien.");
-      }
-      setIsLoading(false);
-    }
-  };
-
-  const loadConversationHistory = async () => {
-    try {
-      const data = await interviewApi.getConversationHistory(interviewId!);
-
-      const loadedMessages: Message[] = data.history.map((msg, index) => ({
-        id: `${Date.now()}-${index}`,
-        role: msg.role === "assistant" ? "assistant" : "user",
-        text: msg.content,
-        timestamp: new Date(),
-      }));
-
-      setMessages(loadedMessages);
-
-      if (loadedMessages.length > 0) {
-        const lastMessage = loadedMessages[loadedMessages.length - 1];
-        if (lastMessage.role === "assistant" && interviewId) {
-          await playAudio(interviewId, lastMessage.text);
-        }
-      }
-    } catch (err) {
-      console.error("Error loading conversation history:", err);
-    }
-  };
-
-  const playAudio = async (sid: string, text: string) => {
-    try {
-      setIsPlayingAudio(true);
-
-      if (currentAudioRef.current) {
-        currentAudioRef.current.pause();
-        currentAudioRef.current = null;
-      }
-
-      const audio = new Audio(interviewApi.getAudioUrl(sid, text));
-      currentAudioRef.current = audio;
-
-      await audio.play();
-
-      await new Promise<void>((resolve, reject) => {
-        audio.onended = () => {
-          setIsPlayingAudio(false);
-          resolve();
-        };
-        audio.onerror = (e) => {
-          console.error("Audio playback error:", e);
-          setIsPlayingAudio(false);
-          reject(e);
-        };
-      });
-    } catch (err) {
-      console.error("Error playing audio:", err);
-      setIsPlayingAudio(false);
-    }
-  };
-
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: "audio/webm;codecs=opus",
-      });
-      audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = async () => {
-        await processRecording();
-        stream.getTracks().forEach((track) => track.stop());
-      };
-
-      mediaRecorder.start();
-      mediaRecorderRef.current = mediaRecorder;
-      setIsRecording(true);
-      setError(null);
-    } catch (err) {
-      console.error("Microphone error:", err);
-      setError("Impossible d'accéder au microphone. Veuillez autoriser l'accès.");
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    }
-  };
-
-  const processRecording = async () => {
-    if (!sessionId || audioChunksRef.current.length === 0) {
-      return;
-    }
-
-    setIsProcessing(true);
-
-    try {
-      const audioBlob = new Blob(audioChunksRef.current, {
-        type: "audio/webm",
-      });
-
-      const data = await interviewApi.submitResponse(sessionId, audioBlob);
-
-      setQuestionCount(data.question_count);
-
-      const userMessage: Message = {
-        id: `${Date.now()}-user`,
-        role: "user",
-        text: data.transcription,
-        timestamp: new Date(),
-      };
-
-      const assistantMessage: Message = {
-        id: `${Date.now()}-assistant`,
-        role: "assistant",
-        text: data.response,
-        timestamp: new Date(),
-      };
-
-      setMessages((prev) => [...prev, userMessage, assistantMessage]);
-
-      if (sessionId) {
-        await playAudio(sessionId, data.response);
-      }
-
-      setIsProcessing(false);
-    } catch (err) {
-      console.error("Error processing recording:", err);
-      setError("Erreur lors du traitement de votre réponse. Veuillez réessayer.");
-      setIsProcessing(false);
-    }
-  };
-
-  const endInterview = async () => {
-    if (!sessionId) return;
-
-    try {
-      setIsProcessing(true);
-
-      const data = await interviewApi.endInterview(sessionId);
-
-      const summaryMessage: Message = {
-        id: Date.now().toString(),
-        role: "assistant",
-        text: data.summary,
-        timestamp: new Date(),
-      };
-
-      setMessages((prev) => [...prev, summaryMessage]);
-
-      if (sessionId) {
-        await playAudio(sessionId, data.summary);
-      }
-
-      setInterviewStarted(false);
-      setIsProcessing(false);
-    } catch (err) {
-      console.error("Error ending interview:", err);
-      setError("Erreur lors de la fin de l'entretien.");
-      setIsProcessing(false);
-    }
+  const handleEndInterview = async () => {
+    await endInterview();
   };
 
   const restartInterview = () => {
-    if (currentAudioRef.current) {
-      currentAudioRef.current.pause();
-      currentAudioRef.current = null;
-    }
+    reset();
     navigate("/setup");
   };
 
@@ -698,7 +521,7 @@ export default function Interview() {
 
                 <div className="flex gap-2">
                   <Button
-                    onClick={endInterview}
+                    onClick={handleEndInterview}
                     disabled={
                       !sessionId ||
                       !interviewStarted ||

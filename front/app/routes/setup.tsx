@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useNavigate } from "react-router";
 import type { Route } from "./+types/setup";
 import { Layout } from "~/components/layout/Layout";
@@ -13,9 +12,9 @@ import {
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Alert, AlertDescription } from "~/components/ui/alert";
-import { interviewApi, ApiError } from "~/lib/api";
 import type { InterviewerType } from "~/types/interview";
 import { cn } from "~/lib/utils";
+import { useSetupStore } from "~/services/usesetupstore";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -62,45 +61,22 @@ const INTERVIEWER_CONFIGS = [
 
 export default function Setup() {
   const navigate = useNavigate();
-  const [candidateName, setCandidateName] = useState("");
-  const [selectedInterviewer, setSelectedInterviewer] =
-    useState<InterviewerType | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isStarting, setIsStarting] = useState(false);
+  
+  // Get state and actions from store
+  const {
+    candidateName,
+    selectedInterviewer,
+    error,
+    isStarting,
+    setCandidateName,
+    setSelectedInterviewer,
+    startInterview,
+  } = useSetupStore();
 
   const handleStart = async () => {
-    if (!candidateName.trim()) {
-      setError("Veuillez entrer votre nom");
-      return;
-    }
-
-    if (!selectedInterviewer) {
-      setError("Veuillez sélectionner un type de recruteur");
-      return;
-    }
-
-    setIsStarting(true);
-    setError(null);
-
-    try {
-      const data = await interviewApi.startInterview({
-        candidate_name: candidateName.trim(),
-        interviewer_type: selectedInterviewer,
-      });
-
-      navigate(`/interview/${data.session_id}`);
-    } catch (err) {
-      console.error("Error starting interview:", err);
-      if (err instanceof ApiError) {
-        setError(
-          err.status === 404
-            ? "Service non disponible"
-            : "Impossible de démarrer l'entretien. Veuillez réessayer."
-        );
-      } else {
-        setError("Impossible de démarrer l'entretien. Veuillez réessayer.");
-      }
-      setIsStarting(false);
+    const sessionId = await startInterview();
+    if (sessionId) {
+      navigate(`/interview/${sessionId}`);
     }
   };
 
@@ -132,10 +108,7 @@ export default function Setup() {
                 id="name"
                 type="text"
                 value={candidateName}
-                onChange={(e) => {
-                  setCandidateName(e.target.value);
-                  setError(null);
-                }}
+                onChange={(e) => setCandidateName(e.target.value)}
                 placeholder="Prénom et nom"
                 className="text-lg h-14 border-2 border-gray-300 focus:border-primary text-gray-900"
                 autoFocus
@@ -155,10 +128,7 @@ export default function Setup() {
                 {INTERVIEWER_CONFIGS.map((config) => (
                   <button
                     key={config.type}
-                    onClick={() => {
-                      setSelectedInterviewer(config.type);
-                      setError(null);
-                    }}
+                    onClick={() => setSelectedInterviewer(config.type)}
                     disabled={isStarting}
                     className={cn(
                       "relative p-6 rounded-2xl border-2 transition-all duration-300 text-left group",
@@ -186,9 +156,7 @@ export default function Setup() {
                         </div>
                       </div>
                     )}
-                    <div className="text-4xl mb-4">
-                      {config.emoji}
-                    </div>
+                    <div className="text-4xl mb-4">{config.emoji}</div>
                     <h3 className="text-xl font-bold mb-2 text-gray-900">
                       {config.label}
                     </h3>

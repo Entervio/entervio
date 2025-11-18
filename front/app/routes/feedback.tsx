@@ -1,22 +1,7 @@
 import { useParams } from "react-router";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import type { Route } from "./+types/feedback";
-
-const API_BASE_URL = `http://${
-  typeof window !== "undefined" ? window.location.hostname : "localhost"
-}:8000/api/v1/voice`;
-
-interface QuestionAnswer {
-  question: string;
-  answer: string;
-  grade: number;
-  feedback: string;
-}
-
-interface InterviewSummary {
-  global_feedback: string;
-  questions: QuestionAnswer[];
-}
+import { useFeedbackStore } from "~/services/usefeedbackstore";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -27,40 +12,15 @@ export function meta({}: Route.MetaArgs) {
 
 export default function Feedback() {
   const { interviewId } = useParams();
-  const [summary, setSummary] = useState<InterviewSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  
+  // Get state and actions from store
+  const { summary, loading, error, fetchSummary } = useFeedbackStore();
 
   useEffect(() => {
-    const fetchSummary = async () => {
-      if (!interviewId) {
-        setError("ID d'entretien manquant");
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/interview/${interviewId}/summary`
-        );
-
-        if (!response.ok) {
-          throw new Error(`Erreur: ${response.status}`);
-        }
-
-        const data = await response.json();
-        setSummary(data);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Erreur lors du chargement"
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSummary();
-  }, [interviewId]);
+    if (interviewId) {
+      fetchSummary(interviewId);
+    }
+  }, [interviewId, fetchSummary]);
 
   if (loading) {
     return (

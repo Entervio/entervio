@@ -1,6 +1,5 @@
-const API_BASE_URL = `http://${
-  typeof window !== "undefined" ? window.location.hostname : "localhost"
-}:8000/api/v1/voice`;
+// API base URL now uses relative path since we have a proxy
+const API_BASE_URL = "/api/v1/voice";
 
 export interface InterviewStartRequest {
   candidate_name: string;
@@ -39,7 +38,7 @@ export interface InterviewEndResponse {
   summary: string;
 }
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(
     public status: number,
     message: string
@@ -174,5 +173,3 @@ export const interviewApi = {
     )}`;
   },
 };
-
-export { ApiError };
