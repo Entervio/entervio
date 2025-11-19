@@ -141,12 +141,10 @@ async def end_interview(
 ):
     """End interview session and get summary."""
     try:
-        result = await interview_service.end_interview(
+        await interview_service.end_interview(
             db=db,
             interview_id=interview_id
         )
-        return result
-        
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:

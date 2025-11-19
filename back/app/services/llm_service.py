@@ -301,22 +301,20 @@ Présentez-vous. Et soyez synthétique."""
         interviewer_type: InterviewerType
     ) -> str:
         """
-        Generate a summary and closing message for the interview.
+        Generate feedback and analysis for the interview.
         
         Args:
             conversation_history: Full conversation history
             interviewer_type: Type of interviewer
             
         Returns:
-            Closing message with brief summary
+            Structured feedback and analysis of the interview performance
         """
-        logger.info(f"📝 Generating interview summary with {interviewer_type} interviewer...")
+        logger.info(f"📝 Generating interview feedback with {interviewer_type} interviewer...")
         
         try:
-            # Create model with appropriate personality
             model = self._create_model(interviewer_type)
             
-            # Convert conversation history
             history = []
             for msg in conversation_history:
                 role = "model" if msg["role"] == "assistant" else msg["role"]
@@ -327,39 +325,56 @@ Présentez-vous. Et soyez synthétique."""
             
             chat = model.start_chat(history=history)
             
-            # Personality-specific closing prompts
-            closing_prompts = {
-                "nice": """L'entretien touche à sa fin. Fais un bref résumé très positif (2-3 phrases), 
-                remercie chaleureusement le candidat et souhaite-lui bonne chance pour la suite.""",
+            feedback_prompts = {
+                "nice": """IMPORTANT: L'entretien est maintenant TERMINÉ. Tu ne poses PLUS de questions.
                 
-                "neutral": """L'entretien est terminé. Fais un résumé factuel en 2-3 phrases, 
-                remercie le candidat professionnellement et indique que l'équipe reviendra vers lui.""",
+                Ta tâche est de rédiger un FEEDBACK DÉTAILLÉ analysant la performance globale du candidat.
                 
-                "mean": """L'entretien est fini. Fais un résumé critique mais constructif en 2-3 phrases, 
-                mentionne ce qui pourrait être amélioré, remercie brièvement."""
+                Analyse:
+                - Les points forts démontrés durant l'entretien
+                - La qualité et la pertinence des réponses données
+                - Les exemples concrets fournis
+                - Les axes d'amélioration possibles
+                
+                Adopte un ton encourageant et constructif. Rédige 4-5 phrases en paragraphes.
+                Ne pose AUCUNE question. Ne dis pas au revoir. Fournis uniquement l'analyse.""",
+                
+                "neutral": """IMPORTANT: L'entretien est maintenant TERMINÉ. Tu ne poses PLUS de questions.
+                
+                Ta tâche est de rédiger un FEEDBACK OBJECTIF analysant la performance du candidat.
+                
+                Analyse:
+                - La structure et la clarté des réponses
+                - La pertinence des exemples et expériences mentionnés
+                - Les compétences démontrées
+                - Les domaines nécessitant un développement
+                
+                Reste factuel et professionnel. Rédige 4-5 phrases en paragraphes.
+                Ne pose AUCUNE question. Ne dis pas au revoir. Fournis uniquement l'analyse.""",
+                
+                "mean": """IMPORTANT: L'entretien est maintenant TERMINÉ. Tu ne poses PLUS de questions.
+                
+                Ta tâche est de rédiger un FEEDBACK CRITIQUE analysant la performance du candidat.
+                
+                Analyse:
+                - Les faiblesses identifiées dans les réponses
+                - Les manques de préparation ou d'expérience concrète
+                - Les réponses vagues ou insuffisantes
+                - Les points à améliorer de manière prioritaire
+                
+                Sois direct et exigeant dans ton évaluation. Rédige 4-5 phrases en paragraphes.
+                Ne pose AUCUNE question. Ne dis pas au revoir. Fournis uniquement l'analyse."""
             }
             
-            response = chat.send_message(closing_prompts[interviewer_type])
-            summary = response.text
+            response = chat.send_message(feedback_prompts[interviewer_type])
+            feedback = response.text
             
-            logger.info("✅ Interview summary generated")
-            return summary
+            logger.info("✅ Interview feedback generated")
+            return feedback
             
         except Exception as e:
-            logger.error(f"❌ Error generating summary: {str(e)}")
-            # Fallback messages by type
-            fallbacks = {
-                "nice": """Merci infiniment pour cet échange ! J'ai vraiment apprécié votre sincérité 
-                et votre enthousiasme. L'équipe reviendra très vite vers vous. Excellente journée !""",
-                
-                "neutral": """Merci pour cet entretien. L'équipe reviendra vers vous prochainement. 
-                Bonne journée.""",
-                
-                "mean": """Bien. On a fait le tour. L'équipe vous contactera si votre profil nous intéresse. 
-                Au revoir."""
-            }
-            return fallbacks[interviewer_type]
-
+            logger.error(f"❌ Error generating feedback: {str(e)}")
+            raise
 
 # Singleton instance - initialized on first import
 _llm_service_instance = None

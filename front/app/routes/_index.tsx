@@ -9,6 +9,15 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
+import {
+  ArrowRight,
+  CheckCircle2,
+  Mic,
+  Users,
+  Archive,
+  BarChart3,
+  Lock,
+} from "lucide-react";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -22,7 +31,6 @@ export function meta({}: Route.MetaArgs) {
 
 export default function Home() {
   return (
-    <Layout>
       <div className="container mx-auto px-6 py-20 max-w-7xl">
         {/* Hero Section */}
         <div className="text-center mb-24">
@@ -46,19 +54,7 @@ export default function Home() {
             <Button asChild size="lg" className="text-lg h-14 px-8 shadow-lg bg-primary hover:bg-primary-600">
               <Link to="/setup">
                 Démarrer un entretien
-                <svg
-                  className="w-5 h-5 ml-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 7l5 5m0 0l-5 5m5-5H6"
-                  />
-                </svg>
+                <ArrowRight className="w-5 h-5 ml-2" />
               </Link>
             </Button>
             <Button
@@ -114,56 +110,32 @@ export default function Home() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               {
-                icon: (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                ),
+                icon: <CheckCircle2 className="w-6 h-6" />,
                 title: "Simulation authentique",
                 desc: "Vivez une expérience d'entretien réaliste avec des questions pertinentes et contextuelles",
               },
               {
-                icon: (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                  </svg>
-                ),
+                icon: <Mic className="w-6 h-6" />,
                 title: "Interaction vocale",
                 desc: "Répondez naturellement à voix haute comme dans un véritable entretien professionnel",
               },
               {
-                icon: (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                ),
+                icon: <Users className="w-6 h-6" />,
                 title: "Profils variés",
                 desc: "Trois styles de recruteur pour vous préparer à toutes les situations",
               },
               {
-                icon: (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                  </svg>
-                ),
+                icon: <Archive className="w-6 h-6" />,
                 title: "Historique complet",
                 desc: "Accédez à tous vos entretiens passés et suivez votre progression",
               },
               {
-                icon: (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                ),
+                icon: <BarChart3 className="w-6 h-6" />,
                 title: "Feedback détaillé",
                 desc: "Recevez des analyses approfondies de vos performances après chaque session",
               },
               {
-                icon: (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                ),
+                icon: <Lock className="w-6 h-6" />,
                 title: "Confidentialité",
                 desc: "Vos données sont sécurisées et vos sessions restent privées",
               },
@@ -185,7 +157,7 @@ export default function Home() {
 
         {/* How it works */}
         <Card className="mb-24 border-2 border-gray-200 overflow-hidden bg-white shadow-xl">
-          <div className="bg-gradient-to-r from-primary to-accent p-8 text-white">
+          <div className="bg-gradient-to-r from-primary to-accent p-8">
             <h2 className="text-3xl md:text-4xl font-bold text-center">
               Comment ça fonctionne ?
             </h2>
@@ -210,7 +182,7 @@ export default function Home() {
                 },
               ].map((step) => (
                 <div key={step.num} className="relative">
-                  <div className="w-16 h-16 bg-primary text-white rounded-2xl flex items-center justify-center text-2xl font-bold mb-6 shadow-lg">
+                  <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center text-2xl font-bold mb-6 shadow-lg">
                     {step.num}
                   </div>
                   <h3 className="font-bold text-xl mb-3 text-gray-900">
@@ -227,11 +199,11 @@ export default function Home() {
 
         {/* CTA */}
         <Card className="border-2 border-gray-200 overflow-hidden shadow-xl bg-white">
-          <div className="bg-gradient-to-r from-secondary via-primary to-accent p-12 md:p-16 text-center text-white">
+          <div className="bg-gradient-to-r from-secondary via-primary to-accent p-12 md:p-16 text-center">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
               Prêt à exceller dans vos entretiens ?
             </h2>
-            <p className="text-xl mb-8 text-white/95 max-w-2xl mx-auto">
+            <p className="text-xl mb-8 max-w-2xl mx-auto">
               Rejoignez des centaines de candidats qui améliorent leurs compétences
               avec Entervio
             </p>
@@ -246,6 +218,5 @@ export default function Home() {
           </div>
         </Card>
       </div>
-    </Layout>
   );
 }

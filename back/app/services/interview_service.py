@@ -204,15 +204,12 @@ class InterviewService:
             
             logger.info(f"👋 Ending interview {interview_id}")
             
-            # If there's a pending question without an answer, mark it as unanswered
             last_qa = interview.question_answers[-1] if interview.question_answers else None
             if last_qa and last_qa.answer is None:
                 last_qa.answer = "[No response provided]"
             
-            # Build conversation history
             conversation_history = self._build_conversation_history(interview)
             
-            # Get final summary with personality
             summary = await self.llm_service.end_interview(
                 conversation_history,
                 interview.interviewer_style
@@ -226,14 +223,6 @@ class InterviewService:
             
             logger.info(f"✅ Interview ended: {interview_id}")
             
-            return {
-                "summary": summary,
-                "session_id": str(interview_id),
-                "interview_id": interview_id,
-                "candidate_name": interview.interviewee_name,
-                "interviewer_style": interview.interviewer_style,
-                "question_count": interview.question_count
-            }
             
         except Exception as e:
             db.rollback()

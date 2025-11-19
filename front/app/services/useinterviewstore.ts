@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router";
 import { create } from "zustand";
 import { interviewApi, ApiError } from "~/lib/api";
 import type { InterviewerType, Message } from "~/types/interview";
@@ -245,23 +246,15 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
     try {
       set({ isProcessing: true });
 
-      const data = await interviewApi.endInterview(sessionId);
-
-      const summaryMessage: Message = {
-        id: Date.now().toString(),
-        role: "assistant",
-        text: data.summary,
-        timestamp: new Date(),
-      };
+      await interviewApi.endInterview(sessionId);
 
       set((state) => ({
-        messages: [...state.messages, summaryMessage],
+        messages: [...state.messages],
         interviewStarted: false,
       }));
 
-      await get().playAudio(sessionId, data.summary);
-
       set({ isProcessing: false });
+
     } catch (err) {
       console.error("Error ending interview:", err);
       set({
