@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from app.models.interview import Interview, InterviewerStyle
+from app.models.candidate import Candidate
 from app.models.question_answer import QuestionAnswer
 from app.services.llm_service import llm_service
 from app.services.voice_service import voice_service
@@ -29,7 +30,8 @@ class InterviewService:
         self, 
         db: Session,
         candidate_name: str, 
-        interviewer_style: InterviewerStyle
+        interviewer_style: InterviewerStyle,
+        candidate_id: Optional[int] = None
     ) -> Dict:
         """
         Start a new interview session.
@@ -48,15 +50,27 @@ class InterviewService:
             # Create interview in database
             db_interview = Interview(
                 interviewee_name=candidate_name,
-                interviewer_style=interviewer_style
+                interviewer_style=interviewer_style,
+                candidate_id=candidate_id
             )
             db.add(db_interview)
             db.flush()  # Get the ID without committing yet
             
+            # Get candidate context if available
+            candidate_context = ""
+            if candidate_id:
+                candidate = db.query(Candidate).filter(Candidate.id == candidate_id).first()
+                if candidate and candidate.parsed_data:
+                    # Use resume service to format context
+                    from app.services.resume_service import resume_service_instance
+                    candidate_context = resume_service_instance.get_core_context(candidate.parsed_data)
+                    logger.info(f"📄 Added resume context for candidate {candidate_id}")
+
             # Get personalized greeting from LLM
             greeting_text = self.llm_service.get_initial_greeting(
                 candidate_name=candidate_name,
-                interviewer_type=interviewer_style
+                interviewer_type=interviewer_style,
+                candidate_context=candidate_context
             )
             
             # Create initial greeting as first question (Q = LLM output, A = user response)
@@ -134,12 +148,29 @@ class InterviewService:
             # Step 3: Build conversation history from database
             conversation_history = self._build_conversation_history(interview)
             
+            # Get candidate context if available
+            candidate_context = ""
+            if interview.candidate:
+                # Ensure we have the latest data
+                # The db object is passed as an argument, not self.db
+                db.refresh(interview.candidate) 
+                if interview.candidate.raw_resume_text:
+                    logger.info(f"Found candidate {interview.candidate.name} with resume text length: {len(interview.candidate.raw_resume_text)}")
+                    candidate_context = interview.candidate.raw_resume_text
+                else:
+                    logger.warning(f"Candidate {interview.candidate.name} has no resume text.")
+            else:
+                logger.warning("No candidate associated with this interview.")
+
+            logger.info(f"Passing candidate_context to LLM (Length: {len(candidate_context)})")
+
             # Step 4: Get LLM response with interviewer personality (next question)
             logger.info(f"🔄 Getting {interview.interviewer_style} interviewer response...")
             llm_response = await self.llm_service.chat(
                 transcribed_text,
                 conversation_history,
-                interview.interviewer_style
+                interview.interviewer_style,
+                candidate_context=candidate_context
             )
             logger.info(f"✅ LLM response: {llm_response[:100]}...")
             

@@ -89,9 +89,14 @@ EXEMPLE DE STYLE:
 IMPORTANT: Sois exigeant mais garde des feedbacks COURTS. Ne sois pas méchant, juste direct et exigeant."""
 }
 
-def get_system_prompt(interviewer_type: InterviewerType) -> str:
+def get_system_prompt(interviewer_type: InterviewerType, candidate_context: str = "") -> str:
     """Get the complete system prompt for the given interviewer type."""
-    return f"{BASE_INTERVIEW_INSTRUCTIONS}\n\n{INTERVIEWER_PROMPTS[interviewer_type]}"
+    base_prompt = f"{BASE_INTERVIEW_INSTRUCTIONS}\n\n{INTERVIEWER_PROMPTS[interviewer_type]}"
+    
+    if candidate_context:
+        base_prompt += f"\n\nCONTEXTE DU CANDIDAT (CV):\n{candidate_context}\n\nINSTRUCTION: Utilise ce contexte pour poser des questions personnalisées sur l'expérience et les compétences du candidat."
+    print(base_prompt)    
+    return base_prompt
 
 
 class LLMService:
@@ -120,11 +125,11 @@ class LLMService:
             logger.error(f"❌ Failed to initialize Gemini client: {str(e)}")
             raise
     
-    def _create_model(self, interviewer_type: InterviewerType):
+    def _create_model(self, interviewer_type: InterviewerType, candidate_context: str = ""):
         """Create a Gemini model with the appropriate system prompt."""
-        system_prompt = get_system_prompt(interviewer_type)
+        system_prompt = get_system_prompt(interviewer_type, candidate_context)
         return genai.GenerativeModel(
-            'gemini-2.5-flash-lite',
+            'gemini-2.0-flash-lite-preview-02-05',
             system_instruction=system_prompt
         )
 
@@ -142,7 +147,8 @@ class LLMService:
     def get_initial_greeting(
         self, 
         candidate_name: str, 
-        interviewer_type: InterviewerType
+        interviewer_type: InterviewerType,
+        candidate_context: str = ""
     ) -> str:
         """
         Generate personalized initial greeting based on interviewer type.
@@ -150,6 +156,7 @@ class LLMService:
         Args:
             candidate_name: The candidate's name
             interviewer_type: Type of interviewer (nice, neutral, mean)
+            candidate_context: Context from resume
             
         Returns:
             Personalized greeting message
@@ -188,7 +195,8 @@ Présentez-vous. Et soyez synthétique."""
         self, 
         message: str, 
         conversation_history: List[Dict[str, str]],
-        interviewer_type: InterviewerType
+        interviewer_type: InterviewerType,
+        candidate_context: str = ""
     ) -> str:
         """
         Send message to Gemini and get interviewer response.
@@ -197,6 +205,7 @@ Présentez-vous. Et soyez synthétique."""
             message: Candidate's message
             conversation_history: List of previous messages
             interviewer_type: Type of interviewer
+            candidate_context: Context from resume
             
         Returns:
             Interviewer's response text
@@ -204,8 +213,8 @@ Présentez-vous. Et soyez synthétique."""
         logger.info(f"💬 Processing candidate response with {interviewer_type} interviewer")
         
         try:
-            # Create model with appropriate personality
-            model = self._create_model(interviewer_type)
+            # Create model with appropriate personality and context
+            model = self._create_model(interviewer_type, candidate_context)
             
             # Convert conversation history to Gemini format
             history = []
