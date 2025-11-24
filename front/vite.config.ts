@@ -7,6 +7,7 @@ export default defineConfig({
   plugins: [tailwindcss(), reactRouter(), tsconfigPaths()],
   server: {
     host: true, // Required for Docker
+    port: 3000,
     proxy: {
       "/api": {
         target: process.env.VITE_BACKEND_URL || "http://localhost:8000",

@@ -1,10 +1,8 @@
-import { useNavigate } from "react-router";
 import { create } from "zustand";
 import { interviewApi, ApiError } from "~/lib/api";
 import type { InterviewerType, Message } from "~/types/interview";
 
 interface InterviewStore {
-  // State
   sessionId: string | null;
   candidateName: string;
   interviewerType: InterviewerType;
@@ -101,7 +99,7 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
         timestamp: new Date(),
       }));
 
-      set({ messages: loadedMessages });
+      set({ messages: loadedMessages, isLoading: false });
 
       // Play last message if it's from assistant
       if (loadedMessages.length > 0) {

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-const API_BASE_URL = "/api/v1/voice";
+const API_BASE_URL = "/api/v1/interviews";
 
 interface QuestionAnswer {
   question: string;
@@ -19,7 +19,6 @@ interface FeedbackStore {
   loading: boolean;
   error: string | null;
 
-  // Actions
   fetchSummary: (interviewId: string) => Promise<void>;
   reset: () => void;
 }
@@ -39,7 +38,7 @@ export const useFeedbackStore = create<FeedbackStore>((set) => ({
 
     try {
       const response = await fetch(
-        `${API_BASE_URL}/interview/${interviewId}/summary`
+        `${API_BASE_URL}/${interviewId}/summary`
       );
 
       if (!response.ok) {

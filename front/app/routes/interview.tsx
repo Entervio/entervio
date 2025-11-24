@@ -224,7 +224,7 @@ export default function Interview() {
           <Alert variant="destructive" className="mb-6 border-2">
             <AlertDescription className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <X className="w-5 h-5 flex-shrink-0" />
+                <X className="w-5 h-5 shrink-0" />
                 <span>{error}</span>
               </div>
               <Button
@@ -356,7 +356,6 @@ export default function Interview() {
                     !interviewStarted ||
                     isPlayingAudio
                   }
-                  variant={isRecording ? "destructive" : "default"}
                   className={cn(
                     "w-full h-16 text-base font-semibold shadow-md",
                     isRecording && "animate-pulse"
@@ -414,7 +413,7 @@ export default function Interview() {
             <Card className="border-2 bg-linear-to-br from-primary/5 to-accent/5">
               <CardContent className="p-6">
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center shrink-0">
                     <Info className="w-5 h-5 text-primary" />
                   </div>
                   <div>

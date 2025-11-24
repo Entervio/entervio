@@ -8,7 +8,6 @@ interface SetupStore {
   error: string | null;
   isStarting: boolean;
 
-  // Actions
   setCandidateName: (name: string) => void;
   setSelectedInterviewer: (type: InterviewerType) => void;
   setError: (error: string | null) => void;
