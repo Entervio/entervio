@@ -2,8 +2,11 @@ import { useParams } from "react-router";
 import { useEffect } from "react";
 import type { Route } from "./+types/feedback";
 import { useFeedbackStore } from "~/services/usefeedbackstore";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
+import { Badge } from "~/components/ui/badge";
+import { Loader2, AlertCircle, CheckCircle2, MessageSquare, Star } from "lucide-react";
 
-export function meta({}: Route.MetaArgs) {
+export function meta({ }: Route.MetaArgs) {
   return [
     { title: "Feedback - Entervio" },
     { name: "description", content: "Résumé de votre entretien d'embauche" },
@@ -12,7 +15,7 @@ export function meta({}: Route.MetaArgs) {
 
 export default function Feedback() {
   const { interviewId } = useParams();
-  
+
   // Get state and actions from store
   const { summary, loading, error, fetchSummary } = useFeedbackStore();
 
@@ -24,79 +27,106 @@ export default function Feedback() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl">Chargement du feedback...</div>
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="text-xl text-muted-foreground">Analyse de votre entretien...</div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl text-red-600">Erreur: {error}</div>
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
+        <AlertCircle className="h-12 w-12 text-destructive" />
+        <div className="text-xl text-destructive">Erreur: {error}</div>
       </div>
     );
   }
 
   if (!summary) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl">Aucun feedback disponible</div>
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
+        <AlertCircle className="h-12 w-12 text-muted-foreground" />
+        <div className="text-xl text-muted-foreground">Aucun feedback disponible</div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <h1 className="text-3xl font-bold mb-8">Résumé de l'entretien</h1>
-
-      {/* Global Feedback */}
-      <div className="mb-8 p-6 bg-blue-50 border border-blue-200 rounded-lg">
-        <h2 className="text-2xl font-semibold mb-4">Feedback Général</h2>
-        <p className="text-gray-800 whitespace-pre-wrap">{summary.feedback}</p>
+    <div className="container mx-auto px-4 py-12 max-w-4xl">
+      <div className="mb-10 text-center">
+        <h1 className="text-4xl font-bold mb-4 tracking-tight">Résumé de l'entretien</h1>
+        <p className="text-muted-foreground text-lg">
+          Voici l'analyse détaillée de votre performance
+        </p>
       </div>
 
-      {/* Question & Answer Pairs */}
-      <div className="space-y-6">
-        <h2 className="text-2xl font-semibold mb-4">Détails par question</h2>
-        {summary.questions.map((qa, index) => (
-          <div
-            key={index}
-            className="p-6 bg-white border border-gray-200 rounded-lg shadow-sm"
-          >
-            <div className="mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                Question {index + 1}
-              </h3>
-              <p className="text-gray-700">{qa.question}</p>
+      {/* Global Feedback */}
+      <Card className="mb-10 border-primary/20 bg-primary/5 backdrop-blur-sm shadow-lg">
+        <CardHeader>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <CheckCircle2 className="h-6 w-6 text-primary" />
             </div>
-
-            <div className="mb-4">
-              <h4 className="text-md font-semibold text-gray-800 mb-2">
-                Votre réponse
-              </h4>
-              <p className="text-gray-600 italic">{qa.answer}</p>
-            </div>
-
-            <div className="mb-4">
-              <h4 className="text-md font-semibold text-gray-800 mb-2">
-                Note
-              </h4>
-              <div className="flex items-center">
-                <span className="text-2xl font-bold text-blue-600">
-                  {qa.grade}
-                </span>
-                <span className="text-gray-500 ml-1">/10</span>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="text-md font-semibold text-gray-800 mb-2">
-                Feedback
-              </h4>
-              <p className="text-gray-700 whitespace-pre-wrap">{qa.feedback}</p>
-            </div>
+            <CardTitle className="text-2xl">Feedback Général</CardTitle>
           </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-foreground/90 whitespace-pre-wrap leading-relaxed text-lg">
+            {summary.feedback}
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Question & Answer Pairs */}
+      <div className="space-y-8">
+        <h2 className="text-2xl font-semibold mb-6 flex items-center gap-2">
+          <MessageSquare className="h-6 w-6 text-primary" />
+          Détails par question
+        </h2>
+
+        {summary.questions.map((qa, index) => (
+          <Card key={index} className="overflow-hidden border-border/60 hover:border-border transition-colors">
+            <CardHeader className="bg-muted/30 pb-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <Badge variant="outline" className="mb-2 bg-background/50">
+                    Question {index + 1}
+                  </Badge>
+                  <h3 className="text-lg font-medium text-foreground leading-snug">
+                    {qa.question}
+                  </h3>
+                </div>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <div className="flex items-center gap-1 bg-background/80 px-3 py-1 rounded-full border border-border shadow-sm">
+                    <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                    <span className="font-bold text-foreground">{qa.grade}</span>
+                    <span className="text-xs text-muted-foreground">/10</span>
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="pt-6 space-y-6">
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                  Votre réponse
+                </h4>
+                <div className="p-4 bg-muted/30 rounded-lg border border-border/50 italic text-muted-foreground">
+                  "{qa.answer}"
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                  Analyse & Conseils
+                </h4>
+                <p className="text-foreground leading-relaxed">
+                  {qa.feedback}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
     </div>

@@ -38,8 +38,12 @@ class ResumeParserService:
         return text
 
     def extract_data_with_llm(self, raw_text: str) -> Dict[str, Any]:
-        # ... (Method remains the same as in your prompt) ...
-        model = genai.GenerativeModel('gemini-2.0-flash-lite-preview-02-05')
+        model = genai.GenerativeModel(
+            'gemini-2.0-flash-lite-preview-02-05',
+            generation_config={
+                "response_mime_type": "application/json"
+            }
+        )
         
         prompt = f"""
         You are a strict Resume Parsing API. 
