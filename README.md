@@ -1,35 +1,52 @@
-# Entervio
+# Entervio 🎙️
 
-A practical, developer-friendly README for the Entervio interview practice platform.
+**AI-Powered Voice Interview Platform**
 
-Entervio provides voice and text interview practice, automatic AI feedback, and configurable interviewer personas.
+Entervio is a modern, full-stack application that simulates realistic job interviews using AI. It features a sleek, minimalist design, real-time voice interaction, and comprehensive feedback to help candidates improve their skills.
 
-![Setup screenshot](assets/screenshots/setup.png)
+![Interview Interface](assets/screenshots/interview.png)
 
-## Features
+## ✨ Features
 
-- Voice (STT) and TTS interviewer prompts
-- Configurable interviewer personas (friendly / professional / strict)
-- Automatic grading and written feedback
-- Optional CV upload and resume parsing
+-   **🤖 AI Interviewer**: Powered by LLMs to conduct dynamic, context-aware interviews.
+-   **🗣️ Real-time Voice Interaction**: Seamless speech-to-text and text-to-speech for a natural conversation flow.
+-   **🎨 Sleek & Minimalist UI**: A distraction-free, "Clean & Light" aesthetic designed for focus.
+-   **📝 Job Context**: Customize the interview based on specific job descriptions.
+-   **📊 Detailed Feedback**: Receive comprehensive grading and actionable advice after every session.
+-   **🎭 Configurable Personas**: Choose from different interviewer styles (Neutral, Friendly, Strict).
 
-## Quick start
+## 📸 Screenshots
 
-Prerequisites: Python 3.11+, Node.js 18+, Docker (optional)
+| Setup | Feedback |
+|:---:|:---:|
+| ![Setup Page](assets/screenshots/setup.png) | ![Feedback Page](assets/screenshots/feedback.png) |
 
-Backend
+## 🛠️ Tech Stack
+
+-   **Frontend**: React (Vite), Tailwind CSS, Lucide Icons
+-   **Backend**: Python (FastAPI), SQLAlchemy, SQLite
+-   **AI/ML**: OpenAI / Anthropic (LLM), ElevenLabs (TTS), Whisper (STT)
+
+## 🚀 Quick Start
+
+### Prerequisites
+-   Python 3.11+
+-   Node.js 18+
+-   API Keys (OpenAI, ElevenLabs)
+
+### Backend Setup
 
 ```bash
 cd back
 python -m venv .venv
-. .venv/bin/activate
+source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 pip install -r requirements.txt
 cp .env.example .env
-# edit .env with your API keys and DB settings
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# Edit .env with your API keys
+uvicorn app.main:app --reload --port 8000
 ```
 
-Frontend
+### Frontend Setup
 
 ```bash
 cd front
@@ -37,30 +54,23 @@ npm install
 npm run dev
 ```
 
-Full stack (Docker Compose)
+The application will be available at `http://localhost:3000`.
+
+## 🐳 Docker Support
+
+Run the entire stack with a single command:
 
 ```bash
-docker compose -f compose.yml up --build
+docker compose up --build
 ```
 
+## 🧪 Testing
 
-## Project layout
-
-```
-entervio/
-├─ back/        # FastAPI backend
-├─ front/       # Vite + React frontend
-├─ compose.yml
-└─ README.md
-```
-
-## Configuration
-
-Copy `.env.example` to `.env` and fill provider keys (OpenAI, ElevenLabs, DB URL, optional S3). Keep secrets out of version control.
-
-## Tests
+Run backend tests:
 
 ```bash
 cd back
-pytest -q
+pytest
 ```
+
+---

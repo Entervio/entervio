@@ -20,7 +20,7 @@ export function Layout({ children }: LayoutProps) {
               <span>•</span>
               <span className="font-semibold text-foreground">Google Gemini</span>
               <span>•</span>
-              <span className="font-semibold text-foreground">Edge TTS</span>
+              <span className="font-semibold text-foreground">ElevenLabs</span>
             </div>
             <div className="text-sm text-muted-foreground">
               © 2024 Entervio. Tous droits réservés.

@@ -63,7 +63,6 @@ async def get_audio(interview_id: int, text: str, db: Session = Depends(get_db))
             # Collect all audio chunks
             async for audio_chunk in voice_service.text_to_speech_stream(
                 text,
-                voice=settings.TTS_VOICE
             ):
                 temp_file.write(audio_chunk)
         

@@ -29,7 +29,8 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     ELEVENLABS_API_KEY: str = ""
 
-    GROQ_API_KEY: str = ""  # ADD THIS
+    ELEVENLABS_VOICE_ID: str = "imRmmzTqlLHt9Do1HufF"
+    GROQ_API_KEY: str = Field(..., env="GROQ_API_KEY")
     GEMINI_API_KEY: str = Field(..., env="GEMINI_API_KEY")
     TTS_VOICE: str = Field(default="fr-FR-DeniseNeural")
     TTS_RATE: str = Field(default="+0%")
@@ -38,7 +39,8 @@ class Settings(BaseSettings):
     
     model_config = SettingsConfigDict(
         env_file=".env",
-        case_sensitive=True
+        case_sensitive=True,
+        extra="ignore"
     )
 
 settings = Settings()
