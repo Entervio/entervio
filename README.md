@@ -4,6 +4,11 @@
 
 Entervio is a modern, full-stack application that simulates realistic job interviews using AI. It features a sleek, minimalist design, real-time voice interaction, and comprehensive feedback to help candidates improve their skills.
 
+## 👥 Authors
+
+* **[Jamal Eddine El Betioui](https://github.com/JamalEddineEb)** 
+* **[Anas Chhilif](https://github.com/AnasChhilif)** 
+
 ![Interview Interface](assets/screenshots/interview.png)
 
 ## ✨ Features
@@ -64,3 +69,10 @@ Run the entire stack with a single command:
 ```bash
 docker compose up --build
 ```
+
+## 🤝 Credits
+
+**Entervio** is a collaborative project built by:
+
+* **[Anas Chhilif](https://github.com/AnasChhilif)** 
+* **[Jamal Eddine El Betioui](https://github.com/JamalEddineEb)**
