@@ -98,7 +98,7 @@ class VoiceService:
         try:
             # Generate the stream
             # 'eleven_turbo_v2_5' is the fastest model for low latency streaming
-            audio_stream = await self.eleven_client.text_to_speech.convert(
+            audio_stream = self.eleven_client.text_to_speech.convert(
                 text=text,
                 voice_id=voice_id,
                 model_id="eleven_turbo_v2_5", 
