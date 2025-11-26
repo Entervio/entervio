@@ -4,7 +4,7 @@
 
 Entervio is a modern, full-stack application that simulates realistic job interviews using AI. It features a sleek, minimalist design, real-time voice interaction, and comprehensive feedback to help candidates improve their skills.
 
-![Interview Interface](assets/screenshots/intervie.png)
+![Interview Interface](assets/screenshots/interview.png)
 
 ## ✨ Features
 
