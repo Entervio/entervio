@@ -4,6 +4,7 @@ export interface InterviewStartRequest {
   candidate_name: string;
   interviewer_type: "nice" | "neutral" | "mean";
   candidate_id?: number;
+  job_description?: string;
 }
 
 export interface InterviewStartResponse {
@@ -70,7 +71,8 @@ export const interviewApi = {
       body: JSON.stringify({
         candidate_name: data.candidate_name,
         interviewer_type: data.interviewer_type,
-        candidate_id: data.candidate_id
+        candidate_id: data.candidate_id,
+        job_description: data.job_description
       }),
     });
 

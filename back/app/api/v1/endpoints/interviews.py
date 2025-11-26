@@ -19,6 +19,7 @@ InterviewerType = Literal["nice", "neutral", "mean"]
 class StartInterviewRequest(BaseModel):
     candidate_name: str
     interviewer_type: InterviewerType
+    job_description: str | None = None
 
 
 @router.post("/start")
@@ -31,7 +32,8 @@ async def start_interview(
         result = await interview_service.start_interview(
             db=db,
             candidate_name=request.candidate_name,
-            interviewer_style=request.interviewer_type
+            interviewer_style=request.interviewer_type,
+            job_description=request.job_description
         )
         return result
         

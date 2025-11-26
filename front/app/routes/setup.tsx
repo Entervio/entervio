@@ -132,10 +132,31 @@ export default function Setup() {
               />
             </div>
 
+            {/* Job Description */}
+            <div className="space-y-4">
+              <Label
+                htmlFor="jobDescription"
+                className="text-base font-medium uppercase tracking-wider text-muted-foreground"
+              >
+                02. Description du poste (Optionnel)
+              </Label>
+              <div className="relative">
+                <FileText className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
+                <textarea
+                  id="jobDescription"
+                  value={useSetupStore((state) => state.jobDescription)}
+                  onChange={(e) => useSetupStore.getState().setJobDescription(e.target.value)}
+                  placeholder="Collez ici la description du poste pour un entretien personnalisé..."
+                  className="flex min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 pl-10 resize-none"
+                  disabled={isStarting}
+                />
+              </div>
+            </div>
+
             {/* Resume Upload */}
             <div className="space-y-4">
               <Label className="text-base font-medium uppercase tracking-wider text-muted-foreground">
-                02. CV (Optionnel)
+                03. CV (Optionnel)
               </Label>
               <div className="group relative">
                 {candidateId ? (
@@ -177,7 +198,7 @@ export default function Setup() {
             {/* Interviewer Selection */}
             <div className="space-y-4">
               <Label className="text-base font-medium uppercase tracking-wider text-muted-foreground">
-                03. Recruteur
+                04. Recruteur
               </Label>
               <div className="grid gap-4 sm:grid-cols-3">
                 {INTERVIEWER_CONFIGS.map((config) => (
@@ -188,8 +209,8 @@ export default function Setup() {
                     className={cn(
                       "group relative p-4 text-left border rounded-xl transition-all duration-200",
                       selectedInterviewer === config.type
-                        ? `${config.activeBorder} ${config.bgActive} text-foreground`
-                        : `border-input hover:border-primary/50 ${config.bgHover} text-muted-foreground hover:text-foreground`,
+                        ? `${config.activeBorder} ${config.bgActive} text-foreground shadow-sm`
+                        : `border-muted hover:border-primary/30 hover:bg-muted/30 text-muted-foreground hover:text-foreground`,
                       "disabled:opacity-50 disabled:cursor-not-allowed"
                     )}
                   >

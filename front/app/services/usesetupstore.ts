@@ -6,12 +6,14 @@ interface SetupStore {
   candidateName: string;
   selectedInterviewer: InterviewerType | null;
   candidateId: number | null;
+  jobDescription: string;
   error: string | null;
   isStarting: boolean;
   isUploading: boolean;
 
   setCandidateName: (name: string) => void;
   setSelectedInterviewer: (type: InterviewerType) => void;
+  setJobDescription: (description: string) => void;
   setError: (error: string | null) => void;
   uploadResume: (file: File) => Promise<void>;
   startInterview: () => Promise<string | null>; // Returns session_id on success
@@ -22,6 +24,7 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
   candidateName: "",
   selectedInterviewer: null,
   candidateId: null,
+  jobDescription: "",
   error: null,
   isStarting: false,
   isUploading: false,
@@ -32,6 +35,10 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
 
   setSelectedInterviewer: (type) => {
     set({ selectedInterviewer: type, error: null });
+  },
+
+  setJobDescription: (description) => {
+    set({ jobDescription: description, error: null });
   },
 
   setError: (error) => {
@@ -57,7 +64,7 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
   },
 
   startInterview: async () => {
-    const { candidateName, selectedInterviewer, candidateId } = get();
+    const { candidateName, selectedInterviewer, candidateId, jobDescription } = get();
 
     if (!candidateName.trim()) {
       set({ error: "Veuillez entrer votre nom" });
@@ -76,6 +83,7 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
         candidate_name: candidateName.trim(),
         interviewer_type: selectedInterviewer,
         candidate_id: candidateId || undefined,
+        job_description: jobDescription.trim() || undefined,
       });
 
       set({ isStarting: false });
@@ -105,6 +113,7 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
       candidateName: "",
       selectedInterviewer: null,
       candidateId: null,
+      jobDescription: "",
       error: null,
       isStarting: false,
     });

@@ -31,7 +31,8 @@ class InterviewService:
         db: Session,
         candidate_name: str, 
         interviewer_style: InterviewerStyle,
-        candidate_id: Optional[int] = None
+        candidate_id: Optional[int] = None,
+        job_description: Optional[str] = None
     ) -> Dict:
         """
         Start a new interview session.
@@ -51,7 +52,8 @@ class InterviewService:
             db_interview = Interview(
                 interviewee_name=candidate_name,
                 interviewer_style=interviewer_style,
-                candidate_id=candidate_id
+                candidate_id=candidate_id,
+                job_description=job_description
             )
             db.add(db_interview)
             db.flush()  # Get the ID without committing yet
@@ -70,7 +72,8 @@ class InterviewService:
             greeting_text = self.llm_service.get_initial_greeting(
                 candidate_name=candidate_name,
                 interviewer_type=interviewer_style,
-                candidate_context=candidate_context
+                candidate_context=candidate_context,
+                job_description=job_description
             )
             
             # Create initial greeting as first question (Q = LLM output, A = user response)
@@ -170,7 +173,8 @@ class InterviewService:
                 transcribed_text,
                 conversation_history,
                 interview.interviewer_style,
-                candidate_context=candidate_context
+                candidate_context=candidate_context,
+                job_description=interview.job_description
             )
             logger.info(f"✅ LLM response: {llm_response[:100]}...")
             

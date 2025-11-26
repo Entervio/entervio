@@ -17,6 +17,7 @@ class Interview(Base):
     question_count = Column(Integer, nullable=False, default=1)
     global_feedback = Column(Text, nullable=True)
     candidate_id = Column(Integer, ForeignKey("candidates.id"), nullable=True)
+    job_description = Column(Text, nullable=True)
     
     # Relationship to candidate
     candidate = relationship("Candidate", back_populates="interviews")

@@ -1,112 +1,66 @@
-# Interview Practice Platform
+# Entervio
 
-An AI-powered SaaS platform for job seekers to practice interviews in French.
+A practical, developer-friendly README for the Entervio interview practice platform.
 
-## Features (Planned)
+Entervio provides voice and text interview practice, automatic AI feedback, and configurable interviewer personas.
 
-- 🎯 Multiple interview types (technical, behavioral, case study)
-- 🎭 Different interviewer personalities (friendly, strict, neutral)
-- 🎤 Voice-based interviews using speech-to-text and text-to-speech
-- 📊 Detailed feedback and analysis on answers
-- 🇫🇷 French language support
+![Setup screenshot](assets/screenshots/setup.png)
 
-## Tech Stack
+## Features
 
-**Backend:**
-- FastAPI
-- SQLAlchemy
-- SQLite (development) / PostgreSQL (production)
-- OpenAI Whisper (speech-to-text)
-- ElevenLabs/OpenAI TTS (text-to-speech)
-- Anthropic Claude (interview generation & analysis)
+- Voice (STT) and TTS interviewer prompts
+- Configurable interviewer personas (friendly / professional / strict)
+- Automatic grading and written feedback
+- Optional CV upload and resume parsing
 
-**Frontend:**
-- React
-- React Router
-- Tailwind CSS
+## Quick start
 
-## Setup
+Prerequisites: Python 3.11+, Node.js 18+, Docker (optional)
 
-### Prerequisites
+Backend
 
-- Python 3.11+ (3.13 recommended)
-- Node.js 18+ (for frontend)
-
-### Backend Setup
-
-1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/interview-platform.git
-cd interview-platform/backend
-```
-
-2. Create and activate virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. Install dependencies:
-```bash
+cd back
+python -m venv .venv
+. .venv/bin/activate
 pip install -r requirements.txt
-```
-
-4. Create `.env` file from template:
-```bash
 cp .env.example .env
-# Edit .env with your configuration
+# edit .env with your API keys and DB settings
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-5. Run the development server:
+Frontend
+
 ```bash
-uvicorn app.main:app --reload
+cd front
+npm install
+npm run dev
 ```
 
-The API will be available at `http://localhost:8000`
+Full stack (Docker Compose)
 
-### API Documentation
-
-Once the server is running:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-
-## Project Structure
-
-```
-backend/
-├── app/
-│   ├── api/
-│   │   └── v1/
-│   │       ├── endpoints/
-│   │       └── router.py
-│   ├── core/
-│   │   └── config.py
-│   ├── models/
-│   ├── schemas/
-│   ├── services/
-│   └── main.py
-├── tests/
-├── requirements.txt
-├── .env.example
-└── README.md
+```bash
+docker compose -f compose.yml up --build
 ```
 
-## Development Roadmap
 
-- [x] Basic FastAPI setup
-- [x] Interview session endpoints
-- [ ] Database models
-- [ ] User authentication
-- [ ] Speech-to-text integration
-- [ ] Text-to-speech integration
-- [ ] AI interview engine
-- [ ] Answer analysis and feedback
-- [ ] Frontend React app
+## Project layout
 
-## License
+```
+entervio/
+├─ back/        # FastAPI backend
+├─ front/       # Vite + React frontend
+├─ compose.yml
+└─ README.md
+```
 
-MIT
+## Configuration
 
-## Contributing
+Copy `.env.example` to `.env` and fill provider keys (OpenAI, ElevenLabs, DB URL, optional S3). Keep secrets out of version control.
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## Tests
+
+```bash
+cd back
+pytest -q
+```
