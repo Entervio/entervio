@@ -63,7 +63,7 @@ export const interviewApi = {
   async startInterview(
     data: InterviewStartRequest
   ): Promise<InterviewStartResponse> {
-    const response = await fetch(`${API_BASE_URL}/voice/interview/start`, {
+    const response = await fetch(`${API_BASE_URL}/interviews/start`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

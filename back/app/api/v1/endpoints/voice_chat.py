@@ -18,33 +18,6 @@ router = APIRouter()
 
 InterviewerType = Literal["nice", "neutral", "mean"]
 
-
-class StartInterviewRequest(BaseModel):
-    candidate_name: str
-    interviewer_type: InterviewerType
-    candidate_id: Optional[int] = None
-
-
-@router.post("/interview/start")
-async def start_interview(
-    request: StartInterviewRequest,
-    db: Session = Depends(get_db)
-):
-    """Start a new interview session."""
-    try:
-        result = await interview_service.start_interview(
-            db=db,
-            candidate_name=request.candidate_name,
-            interviewer_style=request.interviewer_type,
-            candidate_id=request.candidate_id
-        )
-        return result
-        
-    except Exception as e:
-        logger.error(f"❌ Error starting interview: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.get("/interview/{interview_id}/audio")
 async def get_audio(interview_id: int, text: str, db: Session = Depends(get_db)):
     """Convert text to speech and return audio file."""

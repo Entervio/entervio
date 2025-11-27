@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 import tempfile
 import os
-from typing import Literal
+from typing import Literal, Optional
 import logging
 
 from app.services.interview_service import interview_service
@@ -20,6 +20,7 @@ class StartInterviewRequest(BaseModel):
     candidate_name: str
     interviewer_type: InterviewerType
     job_description: str | None = None
+    candidate_id: Optional[int] = None
 
 
 @router.post("/start")
@@ -33,6 +34,7 @@ async def start_interview(
             db=db,
             candidate_name=request.candidate_name,
             interviewer_style=request.interviewer_type,
+            candidate_id=request.candidate_id,
             job_description=request.job_description
         )
         return result
