@@ -4,24 +4,33 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 import tempfile
 import os
-from typing import Literal, Optional
+from typing import Literal, Optional, List, Dict
 import logging
 
 from app.services.interview_service import interview_service
 from app.db import get_db
+from app.schemas import StartInterviewRequest
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-InterviewerType = Literal["nice", "neutral", "mean"]
-
-
-class StartInterviewRequest(BaseModel):
-    candidate_name: str
-    interviewer_type: InterviewerType
-    job_description: str | None = None
-    candidate_id: Optional[int] = None
-
+@router.get("/")
+async def get_interviews(
+    candidate_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    ) -> List[Dict]:
+    """
+    Get list of interviews, optionally filtered by candidate_id.
+    
+    Args:
+        candidate_id: Optional candidate ID to filter interviews
+        db: Database session
+        interview_service: Interview service instance
+    
+    Returns:
+        List of interviews with id, candidate_id, interviewer_style, question_count, and average grade
+    """
+    return interview_service.get_interview_list(db, candidate_id)
 
 @router.post("/start")
 async def start_interview(
