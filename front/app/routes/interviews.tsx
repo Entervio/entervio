@@ -135,7 +135,7 @@ export default function Interviews() {
                 to={`/interviews/${interview.id}`}
               >
                 <Card
-                  className={`cursor-pointer transition-all hover:shadow-md ${
+                  className={`cursor-pointer transition-all hover:shadow-md my-2 ${
                     interviewId === String(interview.id)
                       ? "border-primary shadow-md bg-primary/5"
                       : "border-border hover:border-primary/50"
