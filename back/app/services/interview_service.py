@@ -267,7 +267,7 @@ class InterviewService:
     db: Session,
     candidate_id: Optional[int] = None,
     ) -> List[Dict]:
-        query = db.query(Interview)
+        query = db.query(Interview).filter(Interview.deleted_at.is_(None))
         
         if candidate_id is not None:
             query = query.filter(Interview.candidate_id == candidate_id)
