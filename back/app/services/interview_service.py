@@ -279,7 +279,7 @@ class InterviewService:
         for interview in interviews:
             # Calculate average grade from question_answers
             grades = [qa.grade for qa in interview.question_answers if qa.grade is not None]
-            avg_grade = sum(grades) / len(grades) if grades else None
+            avg_grade = sum(grades) / len(grades) if grades else 0
             
             result.append({
                 "id": interview.id,
