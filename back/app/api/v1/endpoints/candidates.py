@@ -1,7 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from sqlalchemy.orm import Session
 from app.db.database import get_db
-from app.models.candidate import Candidate
+from app.models.user import User
 from app.services.resume_service import resume_service_instance
 import logging
 
@@ -40,7 +40,7 @@ async def upload_resume(
         # Create candidate
         contact_info = parsed_data.get("contact_info", {})
         
-        candidate = Candidate(
+        user = User(
             name=contact_info.get("name"),
             email=contact_info.get("email"),
             phone=contact_info.get("phone"),
@@ -50,15 +50,15 @@ async def upload_resume(
             parsed_data=parsed_data
         )
         
-        db.add(candidate)
+        db.add(user)
         db.commit()
-        db.refresh(candidate)
+        db.refresh(user)
         
         return {
             "message": "Resume uploaded and parsed successfully",
-            "candidate_id": candidate.id,
-            "name": candidate.name,
-            "skills": candidate.skills
+            "candidate_id": user.id,
+            "name": user.name,
+            "skills": user.skills
         }
         
     except Exception as e:

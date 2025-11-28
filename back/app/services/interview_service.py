@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from app.models.interview import Interview, InterviewerStyle
-from app.models.candidate import Candidate
+from app.models.user import User
 from app.models.question_answer import QuestionAnswer
 from app.services.llm_service import llm_service
 from app.services.voice_service import voice_service
@@ -52,7 +52,7 @@ class InterviewService:
             db_interview = Interview(
                 interviewee_name=candidate_name,
                 interviewer_style=interviewer_style,
-                candidate_id=candidate_id,
+                user_id=candidate_id,
                 job_description=job_description
             )
             db.add(db_interview)
@@ -61,7 +61,7 @@ class InterviewService:
             # Get candidate context if available
             candidate_context = ""
             if candidate_id:
-                candidate = db.query(Candidate).filter(Candidate.id == candidate_id).first()
+                candidate = db.query(User).filter(User.id == candidate_id).first()
                 if candidate and candidate.parsed_data:
                     # Use resume service to format context
                     from app.services.resume_service import resume_service_instance
@@ -270,7 +270,7 @@ class InterviewService:
         query = db.query(Interview).filter(Interview.deleted_at.is_(None))
         
         if candidate_id is not None:
-            query = query.filter(Interview.candidate_id == candidate_id)
+            query = query.filter(Interview.user_id == candidate_id)
         
         interviews = query.all()
         
