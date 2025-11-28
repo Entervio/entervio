@@ -32,7 +32,7 @@ export default function Signup() {
     try {
       await authApi.signup({ name, email, password, phone: phone || undefined });
       await login({ email, password });
-      navigate("/", {
+      navigate("/resume", {
         replace: true,
       });
     } catch (err: any) {
