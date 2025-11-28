@@ -126,18 +126,21 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
         currentAudio.pause();
       }
 
-      const audio = new Audio(interviewApi.getAudioUrl(sessionId, text));
+      const audioUrl = await interviewApi.getAudio(sessionId, text);
+      const audio = new Audio(audioUrl);
       set({ currentAudio: audio });
 
       await audio.play();
 
       await new Promise<void>((resolve, reject) => {
         audio.onended = () => {
+          URL.revokeObjectURL(audio.src);
           set({ isPlayingAudio: false });
           resolve();
         };
         audio.onerror = (e) => {
           console.error("Audio playback error:", e);
+          URL.revokeObjectURL(audio.src);
           set({ isPlayingAudio: false });
           reject(e);
         };
