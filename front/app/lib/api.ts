@@ -68,6 +68,27 @@ export interface UploadResumeResponse {
   skills: any;
 }
 
+export interface Interview {
+  id: number;
+  created_at: string;
+  candidate_id: number;
+  interviewer_style: string;
+  question_count: number;
+  grade: number;
+}
+
+export interface QuestionAnswer {
+  question: string;
+  answer: string;
+  grade: number;
+  feedback: string;
+}
+
+export interface InterviewSummary {
+  feedback: string;
+  questions: QuestionAnswer[];
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -254,6 +275,44 @@ export const interviewApi = {
       throw new ApiError(
         response.status,
         `Failed to upload resume: ${response.status}`
+      );
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Get all interviews for the current user
+   */
+  async getInterviews(): Promise<Interview[]> {
+    const response = await fetch(
+      `${API_BASE_URL}/interviews/`,
+      withAuthHeaders(),
+    );
+
+    if (!response.ok) {
+      throw new ApiError(
+        response.status,
+        `Failed to get interviews: ${response.status}`
+      );
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Get interview summary with feedback and grades
+   */
+  async getInterviewSummary(interviewId: string): Promise<InterviewSummary> {
+    const response = await fetch(
+      `${API_BASE_URL}/interviews/${interviewId}/summary`,
+      withAuthHeaders(),
+    );
+
+    if (!response.ok) {
+      throw new ApiError(
+        response.status,
+        `Failed to get interview summary: ${response.status}`
       );
     }
 

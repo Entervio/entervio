@@ -284,7 +284,6 @@ class InterviewService:
             result.append({
                 "id": interview.id,
                 "created_at": interview.created_at,
-                "candidate_id": interview.candidate_id,
                 "interviewer_style": interview.interviewer_style,
                 "question_count": len(interview.question_answers),
                 "grade": avg_grade,

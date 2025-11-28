@@ -1,25 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useParams, Link, Outlet } from "react-router";
 import type { Route } from "./+types/interviews";
 import { Card, CardContent } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { FileText, ArrowRight, Calendar, Star, User } from "lucide-react";
+import { useInterviewListStore } from "~/services/interview-list-store";
 
 export function meta({}: Route.MetaArgs) {
   return [
     { title: "Mes entretiens - Entervio" },
     { name: "description", content: "Historique de vos entretiens" },
   ];
-}
-
-interface Interview {
-  id: number;
-  created_at: string;
-  candidate_id: number;
-  interviewer_style: string;
-  question_count: number;
-  grade: number;
 }
 
 const INTERVIEWER_STYLE_LABELS: Record<string, string> = {
@@ -29,26 +21,12 @@ const INTERVIEWER_STYLE_LABELS: Record<string, string> = {
 };
 
 export default function Interviews() {
-  const [interviews, setInterviews] = useState<Interview[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { interviews, loading, error, fetchInterviews } = useInterviewListStore();
   const { interviewId } = useParams();
 
   useEffect(() => {
-    async function fetchInterviews() {
-      try {
-        const response = await fetch("/api/v1/interviews");
-        if (!response.ok) throw new Error("Erreur lors du chargement");
-        const data = await response.json();
-        setInterviews(data);
-      } catch (error) {
-        console.error("Failed to fetch interviews:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
     fetchInterviews();
-  }, []);
+  }, [fetchInterviews]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -73,6 +51,24 @@ export default function Interviews() {
         <div className="text-center">
           <p className="text-muted-foreground">Chargement...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto px-6 py-16 max-w-4xl">
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="py-12 text-center">
+            <h2 className="text-2xl font-bold text-destructive mb-4">
+              Erreur
+            </h2>
+            <p className="text-muted-foreground mb-6">{error}</p>
+            <Button asChild variant="outline">
+              <Link to="/setup">Retour à l'accueil</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
