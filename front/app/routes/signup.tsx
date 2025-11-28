@@ -1,42 +1,39 @@
-import type { Route } from "./+types/login";
+import type { Route } from "./+types/signup";
 import { useState } from "react";
-import { useNavigate, useLocation, Link } from "react-router";
+import { useNavigate, Link } from "react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { useAuth } from "~/context/AuthContext";
+import { authApi } from "~/lib/api";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Connexion - Entervio" },
-    { name: "description", content: "Connectez-vous pour accéder à Entervio" },
+    { title: "Créer un compte - Entervio" },
+    { name: "description", content: "Créez votre compte Entervio" },
   ];
 }
 
-export default function Login() {
-  const { login, isLoading, user } = useAuth();
+export default function Signup() {
   const navigate = useNavigate();
-  const location = useLocation();
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  const from = (location.state as any)?.from?.pathname || "/";
-
-  if (!isLoading && user) {
-    navigate(from, { replace: true });
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
+
     try {
-      await login({ email, password });
-      navigate(from, { replace: true });
+      await authApi.signup({ name, email, password, phone: phone || undefined });
+      navigate("/login", {
+        replace: true,
+      });
     } catch (err: any) {
-      setError(err?.message ?? "Échec de la connexion");
+      setError(err?.message ?? "Échec de la création du compte");
     } finally {
       setSubmitting(false);
     }
@@ -46,10 +43,22 @@ export default function Login() {
     <div className="container mx-auto px-6 py-16 max-w-md">
       <Card className="border-2 shadow-lg">
         <CardHeader>
-          <CardTitle className="text-2xl text-center">Connexion</CardTitle>
+          <CardTitle className="text-2xl text-center">Créer un compte</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="name">
+                Nom
+              </label>
+              <Input
+                id="name"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoComplete="name"
+              />
+            </div>
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor="email">
                 Email
@@ -73,7 +82,18 @@ export default function Login() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="phone">
+                Téléphone (optionnel)
+              </label>
+              <Input
+                id="phone"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                autoComplete="tel"
               />
             </div>
             {error && (
@@ -82,17 +102,12 @@ export default function Login() {
               </p>
             )}
             <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? "Connexion..." : "Se connecter"}
+              {submitting ? "Création du compte..." : "Créer mon compte"}
             </Button>
             <p className="text-xs text-muted-foreground text-center mt-4">
-              Pas encore de compte ?{" "}
-              <Link to="/signup" className="underline">
-                Créer un compte
-              </Link>
-            </p>
-            <p className="text-xs text-muted-foreground text-center mt-2">
-              <Link to="/" className="underline">
-                Retour à l'accueil
+              Vous avez déjà un compte ?{" "}
+              <Link to="/login" className="underline">
+                Se connecter
               </Link>
             </p>
           </form>

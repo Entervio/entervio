@@ -99,6 +99,19 @@ export class ApiError extends Error {
   }
 }
 
+export interface SignupRequest {
+  name: string;
+  email: string;
+  password: string;
+  phone?: string;
+}
+
+export interface SignupResponse {
+  id: number;
+  email: string;
+  name: string;
+}
+
 export const interviewApi = {
   /**
    * Start a new interview session
@@ -314,6 +327,36 @@ export const interviewApi = {
         response.status,
         `Failed to get interview summary: ${response.status}`
       );
+    }
+
+    return response.json();
+  },
+};
+
+export const authApi = {
+  async signup(payload: SignupRequest): Promise<SignupResponse> {
+    const response = await fetch(`${API_BASE_URL}/auth/signup`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      let message = "Échec de la création du compte";
+      try {
+        const data = await response.json();
+        if (typeof (data as any).detail === "string") {
+          message = (data as any).detail;
+        } else if ((data as any).detail?.message) {
+          message = (data as any).detail.message;
+        }
+      } catch {
+        // ignore JSON parse errors
+      }
+
+      throw new ApiError(response.status, message);
     }
 
     return response.json();
