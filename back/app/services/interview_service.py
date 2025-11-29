@@ -1,5 +1,5 @@
 """Interview Service - Business logic for managing interviews"""
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 import logging
 import asyncio
 from sqlalchemy.orm import Session
@@ -252,8 +252,6 @@ class InterviewService:
 
             interview.global_feedback = summary
 
-            interview.question_count = interview.question_count + 1
-            
             db.commit()
             
             logger.info(f"✅ Interview ended: {interview_id}")
@@ -263,6 +261,36 @@ class InterviewService:
             db.rollback()
             logger.error(f"❌ Error ending interview: {str(e)}")
             raise
+
+    def get_interview_list(
+    self,
+    db: Session,
+    candidate_id: Optional[int] = None,
+    ) -> List[Dict]:
+        query = db.query(Interview).filter(Interview.deleted_at.is_(None))
+        
+        if candidate_id is not None:
+            query = query.filter(Interview.candidate_id == candidate_id)
+        
+        interviews = query.all()
+        
+        # Convert to dictionaries with calculated average grade
+        result = []
+        for interview in interviews:
+            # Calculate average grade from question_answers
+            grades = [qa.grade for qa in interview.question_answers if qa.grade is not None]
+            avg_grade = sum(grades) / len(grades) if grades else 0
+            
+            result.append({
+                "id": interview.id,
+                "created_at": interview.created_at,
+                "candidate_id": interview.candidate_id,
+                "interviewer_style": interview.interviewer_style,
+                "question_count": len(interview.question_answers),
+                "grade": avg_grade,
+            })
+        
+        return result
     
     def get_session_info(self, db: Session, interview_id: int) -> Optional[Dict]:
         """
@@ -404,6 +432,7 @@ class InterviewService:
                 })
         
         return history
+    
 
 
 # Singleton instance
