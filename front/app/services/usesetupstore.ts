@@ -67,11 +67,6 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
   startInterview: async () => {
     const { candidateName, selectedInterviewer, candidateId, jobDescription } = get();
     
-    if (!candidateName.trim()) {
-      set({ error: "Veuillez entrer votre nom" });
-      return null;
-    }
-    
     if (!selectedInterviewer) {
       set({ error: "Veuillez sélectionner un type de recruteur" });
       return null;

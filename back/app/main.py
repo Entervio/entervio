@@ -6,19 +6,12 @@ from app.api.v1.router import api_router
 
 import logging
 
-# Import all models to ensure they're registered with Base
 from app.models.interview import Interview
 from app.models.question_answer import QuestionAnswer
 from app.models.user import User
 
-# Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Create database tables
-logger.info("🔄 Creating database tables...")
-Base.metadata.create_all(bind=engine)
-logger.info("✅ Database tables created!")
 
 app = FastAPI(
     title="Voice Interview API",
@@ -29,13 +22,12 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify your frontend domain
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include API router
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
 

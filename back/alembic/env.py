@@ -10,8 +10,14 @@ from app.models.interview import Interview
 from app.models.question_answer import QuestionAnswer
 from app.models.user import User
 
+# Import settings to get DATABASE_URL
+from app.core.config import settings
+
 # Alembic Config object
 config = context.config
+
+# Set database URL programmatically from your settings
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 # Set up Python logging
 if config.config_file_name is not None:
@@ -19,10 +25,6 @@ if config.config_file_name is not None:
 
 # Set target metadata - this is what Alembic uses to detect your tables
 target_metadata = Base.metadata
-
-# Set database URL programmatically (optional)
-# from app.config import settings
-# config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
@@ -32,7 +34,6 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
-
     with context.begin_transaction():
         context.run_migrations()
 
@@ -42,13 +43,11 @@ def run_migrations_online() -> None:
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
-
     with connectable.connect() as connection:
         context.configure(
             connection=connection, 
             target_metadata=target_metadata
         )
-
         with context.begin_transaction():
             context.run_migrations()
 
