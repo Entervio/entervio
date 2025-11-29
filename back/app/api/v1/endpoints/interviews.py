@@ -65,7 +65,7 @@ async def start_interview(
         return result
         
     except Exception as e:
-        logger.error(f"❌ Error starting interview: {str(e)}")
+        logger.error(f"Error starting interview: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

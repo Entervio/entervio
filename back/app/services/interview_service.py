@@ -46,7 +46,7 @@ class InterviewService:
             Dict with interview_id, greeting text, and interview details
         """
         try:
-            logger.info(f"✅ Starting interview: {user.name} | {interviewer_style}")
+            logger.info(f"Starting interview: {user.name} | {interviewer_style}")
             
             # Create interview in database
             db_interview = Interview(
@@ -62,7 +62,7 @@ class InterviewService:
             if user and user.parsed_data:
                 # Use resume service to format context
                 candidate_context = resume_service_instance.get_core_context(user.parsed_data)
-                logger.info(f"📄 Added resume context for candidate {candidate_id}")
+                logger.info(f"📄 Added resume context for candidate {user.id}")
 
             # Get personalized greeting from LLM
             greeting_text = self.llm_service.get_initial_greeting(
@@ -82,7 +82,7 @@ class InterviewService:
             db.commit()
             db.refresh(db_interview)
             
-            logger.info(f"👋 Generated {interviewer_style} greeting for {user.name}")
+            logger.info(f"Generated {interviewer_style} greeting for {user.name}")
             
             return {
                 "session_id": str(db_interview.id),  # Return as string for compatibility
@@ -95,7 +95,7 @@ class InterviewService:
             
         except Exception as e:
             db.rollback()
-            logger.error(f"❌ Error starting interview: {str(e)}")
+            logger.error(f"Error starting interview: {str(e)}")
             raise
     
     async def process_response(

@@ -38,3 +38,4 @@ elevenlabs==2.24.0
 pdfplumber==0.11.8
 Requests==2.32.5
 spacy==3.8.11
+email-validator==2.3.0
