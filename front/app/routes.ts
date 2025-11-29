@@ -8,9 +8,11 @@ export default [
     index("routes/_index.tsx"),
     route("setup", "routes/setup.tsx"),
     route("account", "routes/account.tsx"),
-    route("interviews", "routes/interviews.tsx"),
-    route("interviews/:id", "routes/InterviewFeedback.tsx"),
-    route("interview/:sessionId", "routes/interview.tsx"),
+    route("interviews", "routes/interviews.tsx", [
+      index("routes/interviews._index.tsx"),
+      route(":interviewId", "routes/InterviewFeedback.tsx"),
+    ]),
+    route("interview/:interviewId", "routes/interview.tsx"),
     route("feedback/:interviewId", "routes/feedback.tsx"),
   ]),
 ] satisfies RouteConfig;
