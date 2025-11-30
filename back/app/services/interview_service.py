@@ -147,17 +147,16 @@ class InterviewService:
             # Step 3: Build conversation history from database
             conversation_history = self._build_conversation_history(interview)
             
-            # Get candidate context if available
             candidate_context = ""
-            if interview.candidate:
+            if interview.user:
                 # Ensure we have the latest data
                 # The db object is passed as an argument, not self.db
-                db.refresh(interview.candidate) 
-                if interview.candidate.raw_resume_text:
-                    logger.info(f"Found candidate {interview.candidate.name} with resume text length: {len(interview.candidate.raw_resume_text)}")
-                    candidate_context = interview.candidate.raw_resume_text
+                db.refresh(interview.user) 
+                if interview.user.raw_resume_text:
+                    logger.info(f"Found candidate {interview.user.name} with resume text length: {len(interview.user.raw_resume_text)}")
+                    candidate_context = interview.user.raw_resume_text
                 else:
-                    logger.warning(f"Candidate {interview.candidate.name} has no resume text.")
+                    logger.warning(f"Candidate {interview.user.name} has no resume text.")
             else:
                 logger.warning("No candidate associated with this interview.")
 
