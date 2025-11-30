@@ -14,6 +14,7 @@ interface InterviewStore {
   isPlayingAudio: boolean;
   questionCount: number;
   isLoading: boolean;
+  loadingInterviewId: string | null; // Add this
 
   // Refs (stored in state for persistence)
   mediaRecorder: MediaRecorder | null;
@@ -45,6 +46,7 @@ const initialState = {
   isPlayingAudio: false,
   questionCount: 0,
   isLoading: true,
+  loadingInterviewId: null, // Add this
   mediaRecorder: null,
   audioChunks: [] as Blob[],
   currentAudio: null,
@@ -54,8 +56,16 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
   ...initialState,
 
   loadInterviewData: async (interviewId: string) => {
+    const state = get();
+    
+    // Prevent duplicate loads - this fixes the double API call issue
+    if (state.loadingInterviewId === interviewId) {
+      console.log("Already loading this interview, skipping duplicate call");
+      return true;
+    }
+
     try {
-      set({ isLoading: true, error: null });
+      set({ loadingInterviewId: interviewId, isLoading: true, error: null });
 
       const data = await interviewApi.getInterviewInfo(interviewId);
 
@@ -69,7 +79,7 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
 
       await get().loadConversationHistory(interviewId);
 
-      set({ isLoading: false });
+      set({ isLoading: false, loadingInterviewId: null });
       return true;
     } catch (err) {
       console.error("Error loading interview:", err);
@@ -77,11 +87,13 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
         set({
           error: "Session non trouvée. Redirection...",
           isLoading: false,
+          loadingInterviewId: null,
         });
       } else {
         set({
           error: "Impossible de charger l'entretien.",
           isLoading: false,
+          loadingInterviewId: null,
         });
       }
       return false;
