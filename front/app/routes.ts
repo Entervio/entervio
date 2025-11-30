@@ -13,6 +13,6 @@ export default [
       route(":interviewId", "routes/InterviewFeedback.tsx"),
     ]),
     route("interview/:interviewId", "routes/interview.tsx"),
-    route("feedback/:interviewId", "routes/feedback.tsx"),
+    route("interview/:interviewId/feedback", "routes/feedback.tsx"),
   ]),
 ] satisfies RouteConfig;
