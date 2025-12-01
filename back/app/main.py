@@ -9,7 +9,7 @@ import logging
 # Import all models to ensure they're registered with Base
 from app.models.interview import Interview
 from app.models.question_answer import QuestionAnswer
-from app.models.candidate import Candidate
+from app.models.user import User
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)

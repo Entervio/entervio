@@ -6,11 +6,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from app.models.interview import Interview, InterviewerStyle
-from app.models.candidate import Candidate
+from app.models.user import User
 from app.models.question_answer import QuestionAnswer
 from app.services.llm_service import llm_service
 from app.services.voice_service import voice_service
 from app.services.grading_service import grading_service
+from app.services.resume_service import resume_service_instance
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +30,8 @@ class InterviewService:
     async def start_interview(
         self, 
         db: Session,
-        candidate_name: str, 
         interviewer_style: InterviewerStyle,
-        candidate_id: Optional[int] = None,
+        user: User,
         job_description: Optional[str] = None
     ) -> Dict:
         """
@@ -46,13 +46,12 @@ class InterviewService:
             Dict with interview_id, greeting text, and interview details
         """
         try:
-            logger.info(f"✅ Starting interview: {candidate_name} | {interviewer_style}")
+            logger.info(f"Starting interview: {user.name} | {interviewer_style}")
             
             # Create interview in database
             db_interview = Interview(
-                interviewee_name=candidate_name,
                 interviewer_style=interviewer_style,
-                candidate_id=candidate_id,
+                user_id=user.id,
                 job_description=job_description
             )
             db.add(db_interview)
@@ -60,17 +59,14 @@ class InterviewService:
             
             # Get candidate context if available
             candidate_context = ""
-            if candidate_id:
-                candidate = db.query(Candidate).filter(Candidate.id == candidate_id).first()
-                if candidate and candidate.parsed_data:
-                    # Use resume service to format context
-                    from app.services.resume_service import resume_service_instance
-                    candidate_context = resume_service_instance.get_core_context(candidate.parsed_data)
-                    logger.info(f"📄 Added resume context for candidate {candidate_id}")
+            if user and user.parsed_data:
+                # Use resume service to format context
+                candidate_context = resume_service_instance.get_core_context(user.parsed_data)
+                logger.info(f"📄 Added resume context for candidate {user.id}")
 
             # Get personalized greeting from LLM
             greeting_text = self.llm_service.get_initial_greeting(
-                candidate_name=candidate_name,
+                candidate_name=user.name,
                 interviewer_type=interviewer_style,
                 candidate_context=candidate_context,
                 job_description=job_description
@@ -86,20 +82,20 @@ class InterviewService:
             db.commit()
             db.refresh(db_interview)
             
-            logger.info(f"👋 Generated {interviewer_style} greeting for {candidate_name}")
+            logger.info(f"Generated {interviewer_style} greeting for {user.name}")
             
             return {
                 "session_id": str(db_interview.id),  # Return as string for compatibility
                 "interview_id": db_interview.id,
                 "text": greeting_text,
-                "candidate_name": candidate_name,
+                "candidate_name": user.name,
                 "interviewer_style": interviewer_style,
                 "message": "Interview session started"
             }
             
         except Exception as e:
             db.rollback()
-            logger.error(f"❌ Error starting interview: {str(e)}")
+            logger.error(f"Error starting interview: {str(e)}")
             raise
     
     async def process_response(
@@ -151,17 +147,16 @@ class InterviewService:
             # Step 3: Build conversation history from database
             conversation_history = self._build_conversation_history(interview)
             
-            # Get candidate context if available
             candidate_context = ""
-            if interview.candidate:
+            if interview.user:
                 # Ensure we have the latest data
                 # The db object is passed as an argument, not self.db
-                db.refresh(interview.candidate) 
-                if interview.candidate.raw_resume_text:
-                    logger.info(f"Found candidate {interview.candidate.name} with resume text length: {len(interview.candidate.raw_resume_text)}")
-                    candidate_context = interview.candidate.raw_resume_text
+                db.refresh(interview.user) 
+                if interview.user.raw_resume_text:
+                    logger.info(f"Found candidate {interview.user.name} with resume text length: {len(interview.user.raw_resume_text)}")
+                    candidate_context = interview.user.raw_resume_text
                 else:
-                    logger.warning(f"Candidate {interview.candidate.name} has no resume text.")
+                    logger.warning(f"Candidate {interview.user.name} has no resume text.")
             else:
                 logger.warning("No candidate associated with this interview.")
 
@@ -270,7 +265,7 @@ class InterviewService:
         query = db.query(Interview).filter(Interview.deleted_at.is_(None))
         
         if candidate_id is not None:
-            query = query.filter(Interview.candidate_id == candidate_id)
+            query = query.filter(Interview.user_id == candidate_id)
         
         interviews = query.all()
         
@@ -284,7 +279,6 @@ class InterviewService:
             result.append({
                 "id": interview.id,
                 "created_at": interview.created_at,
-                "candidate_id": interview.candidate_id,
                 "interviewer_style": interview.interviewer_style,
                 "question_count": len(interview.question_answers),
                 "grade": avg_grade,
@@ -316,7 +310,7 @@ class InterviewService:
         return {
             "session_id": str(interview_id),
             "interview_id": interview_id,
-            "candidate_name": interview.interviewee_name,
+            "candidate_name": interview.user.name,
             "interviewer_style": interview.interviewer_style,
             "question_count": question_count
         }
@@ -348,7 +342,7 @@ class InterviewService:
         return {
             "session_id": str(interview_id),
             "interview_id": interview_id,
-            "candidate_name": interview.interviewee_name,
+            "candidate_name": interview.user.name,
             "interviewer_style": interview.interviewer_style,
             "question_count": question_count,
             "history": conversation_history

@@ -8,15 +8,17 @@ from typing import Literal, Optional, List, Dict
 import logging
 
 from app.services.interview_service import interview_service
+from app.models.user import User
 from app.db import get_db
 from app.schemas import StartInterviewRequest
+from app.core.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get("/")
 async def get_interviews(
-    candidate_id: Optional[int] = None,
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
     ) -> List[Dict]:
     """
@@ -30,26 +32,40 @@ async def get_interviews(
     Returns:
         List of interviews with id, candidate_id, interviewer_style, question_count, and average grade
     """
-    return interview_service.get_interview_list(db, candidate_id)
+    supabase_id = current_user.get("sub")
+    if not supabase_id:
+        raise HTTPException(status_code=401, detail="Invalid Supabase token: missing subject")
+
+    user = db.query(User).filter(User.supabase_id == supabase_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found for Supabase ID")
+    return interview_service.get_interview_list(db, user.id)
 
 @router.post("/start")
 async def start_interview(
     request: StartInterviewRequest,
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Start a new interview session."""
     try:
+        supabase_id = current_user.get("sub")
+        if not supabase_id:
+            raise HTTPException(status_code=401, detail="Invalid Supabase token: missing subject")
+
+        user = db.query(User).filter(User.supabase_id == supabase_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found for Supabase ID")
         result = await interview_service.start_interview(
             db=db,
-            candidate_name=request.candidate_name,
+            user=user,
             interviewer_style=request.interviewer_type,
-            candidate_id=request.candidate_id,
             job_description=request.job_description
         )
         return result
         
     except Exception as e:
-        logger.error(f"❌ Error starting interview: {str(e)}")
+        logger.error(f"Error starting interview: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

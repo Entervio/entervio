@@ -1,24 +1,11 @@
 import { create } from "zustand";
-
-const API_BASE_URL = "/api/v1/interviews";
-
-interface QuestionAnswer {
-  question: string;
-  answer: string;
-  grade: number;
-  feedback: string;
-}
-
-interface InterviewSummary {
-  feedback: string;
-  questions: QuestionAnswer[];
-}
+import { interviewApi, ApiError } from "~/lib/api";
+import type { InterviewSummary } from "~/lib/api";
 
 interface FeedbackStore {
   summary: InterviewSummary | null;
   loading: boolean;
   error: string | null;
-
   fetchSummary: (interviewId: string) => Promise<void>;
   reset: () => void;
 }
@@ -37,22 +24,24 @@ export const useFeedbackStore = create<FeedbackStore>((set) => ({
     set({ loading: true, error: null });
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/${interviewId}/summary`
-      );
-
-      if (!response.ok) {
-        throw new Error(`Erreur: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await interviewApi.getInterviewSummary(interviewId);
       set({ summary: data, loading: false });
     } catch (err) {
-      set({
-        error:
-          err instanceof Error ? err.message : "Erreur lors du chargement",
-        loading: false,
-      });
+      console.error("Error fetching summary:", err);
+      
+      if (err instanceof ApiError) {
+        set({
+          error: err.status === 404 
+            ? "Résumé non trouvé" 
+            : `Erreur: ${err.status}`,
+          loading: false,
+        });
+      } else {
+        set({
+          error: err instanceof Error ? err.message : "Erreur lors du chargement",
+          loading: false,
+        });
+      }
     }
   },
 

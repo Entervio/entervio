@@ -24,6 +24,13 @@ class Settings(BaseSettings):
         "http://localhost:5173"
     ]
     
+    # Supabase Auth
+    SUPABASE_URL: str = Field(default="", env="SUPABASE_URL")
+    SUPABASE_ANON_KEY: str = Field(default="", env="SUPABASE_ANON_KEY")
+    SUPABASE_JWT_SECRET: str = Field(default="", env="SUPABASE_JWT_SECRET")
+    SUPABASE_JWT_AUDIENCE: str = Field(default="authenticated", env="SUPABASE_JWT_AUDIENCE")
+    SUPABASE_SERVICE_ROLE_KEY: str = Field(default="", env="SUPABASE_SERVICE_ROLE_KEY")
+    
     # AI Services
     ANTHROPIC_API_KEY: str = ""
     OPENAI_API_KEY: str = ""

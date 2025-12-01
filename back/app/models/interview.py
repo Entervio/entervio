@@ -13,11 +13,10 @@ class Interview(Base):
     __tablename__ = "interviews"
     
     id = Column(Integer, primary_key=True, index=True)
-    interviewee_name = Column(String, nullable=False)
     interviewer_style = Column(Enum(InterviewerStyle), nullable=False)
     question_count = Column(Integer, nullable=False, default=1)
     global_feedback = Column(Text, nullable=True)
-    candidate_id = Column(Integer, ForeignKey("candidates.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     job_description = Column(Text, nullable=True)
     
     # Timestamps
@@ -26,7 +25,7 @@ class Interview(Base):
     deleted_at = Column(DateTime, nullable=True)
     
     # Relationship to candidate
-    candidate = relationship("Candidate", back_populates="interviews")
+    user = relationship("User", back_populates="interviews")
     
     # Relationship to question_answers
     question_answers = relationship(

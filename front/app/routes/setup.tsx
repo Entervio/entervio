@@ -112,33 +112,13 @@ export default function Setup() {
         {/* Main Setup Section */}
         <div className="grid gap-12 md:grid-cols-[1fr_300px]">
           <div className="space-y-10">
-            {/* Name Input */}
-            <div className="space-y-4">
-              <Label
-                htmlFor="name"
-                className="text-base font-medium uppercase tracking-wider text-muted-foreground"
-              >
-                01. Identité
-              </Label>
-              <Input
-                id="name"
-                type="text"
-                value={candidateName}
-                onChange={(e) => setCandidateName(e.target.value)}
-                placeholder="Votre nom complet"
-                className="h-12 text-lg border-x-0 border-t-0 border-b border-input bg-transparent px-0 focus-visible:ring-0 focus-visible:border-primary text-foreground placeholder:text-muted-foreground/50"
-                autoFocus
-                disabled={isStarting}
-              />
-            </div>
-
             {/* Job Description */}
             <div className="space-y-4">
               <Label
                 htmlFor="jobDescription"
                 className="text-base font-medium uppercase tracking-wider text-muted-foreground"
               >
-                02. Description du poste (Optionnel)
+                01. Description du poste (Optionnel)
               </Label>
               <div className="relative">
                 <FileText className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
@@ -156,7 +136,7 @@ export default function Setup() {
             {/* Resume Upload */}
             <div className="space-y-4">
               <Label className="text-base font-medium uppercase tracking-wider text-muted-foreground">
-                03. CV (Optionnel)
+                02. CV (Optionnel)
               </Label>
               <div className="group relative">
                 {candidateId ? (
@@ -198,7 +178,7 @@ export default function Setup() {
             {/* Interviewer Selection */}
             <div className="space-y-4">
               <Label className="text-base font-medium uppercase tracking-wider text-muted-foreground">
-                04. Recruteur
+                03. Recruteur
               </Label>
               <div className="grid gap-4 sm:grid-cols-3">
                 {INTERVIEWER_CONFIGS.map((config) => (

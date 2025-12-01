@@ -1,8 +1,9 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from sqlalchemy.orm import Session
 from app.db.database import get_db
-from app.models.candidate import Candidate
+from app.models.user import User
 from app.services.resume_service import resume_service_instance
+from app.core.auth import get_current_user
 import logging
 
 router = APIRouter()
@@ -11,7 +12,8 @@ logger = logging.getLogger(__name__)
 @router.post("/upload_resume")
 async def upload_resume(
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Upload a resume (PDF), parse it, and create a candidate profile.
@@ -37,28 +39,28 @@ async def upload_resume(
         if "error" in parsed_data:
              raise HTTPException(status_code=500, detail=parsed_data["error"])
         
-        # Create candidate
-        contact_info = parsed_data.get("contact_info", {})
-        
-        candidate = Candidate(
-            name=contact_info.get("name"),
-            email=contact_info.get("email"),
-            phone=contact_info.get("phone"),
-            skills=parsed_data.get("skills"),
-            experience=parsed_data.get("work_experience"),
-            raw_resume_text=raw_text,
-            parsed_data=parsed_data
-        )
-        
-        db.add(candidate)
+        supabase_id = current_user.get("sub")
+        if not supabase_id:
+            raise HTTPException(status_code=401, detail="Invalid Supabase token: missing subject")
+
+        user = db.query(User).filter(User.supabase_id == supabase_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found for Supabase ID")
+
+        user.skills = parsed_data.get("skills")
+        user.experience = parsed_data.get("work_experience")
+        user.raw_resume_text = raw_text
+        user.parsed_data = parsed_data
+
+        db.add(user)
         db.commit()
-        db.refresh(candidate)
+        db.refresh(user)
         
         return {
             "message": "Resume uploaded and parsed successfully",
-            "candidate_id": candidate.id,
-            "name": candidate.name,
-            "skills": candidate.skills
+            "candidate_id": user.id,
+            "name": user.name,
+            "skills": user.skills
         }
         
     except Exception as e:

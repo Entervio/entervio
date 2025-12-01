@@ -47,11 +47,12 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
 
   uploadResume: async (file) => {
     set({ isUploading: true, error: null });
+    
     try {
       const data = await interviewApi.uploadResume(file);
       set({
         candidateId: data.candidate_id,
-        candidateName: data.name || get().candidateName, // Auto-fill name if available and not set
+        candidateName: data.name || get().candidateName,
         isUploading: false
       });
     } catch (err) {
@@ -65,12 +66,12 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
 
   startInterview: async () => {
     const { candidateName, selectedInterviewer, candidateId, jobDescription } = get();
-
+    
     if (!candidateName.trim()) {
       set({ error: "Veuillez entrer votre nom" });
       return null;
     }
-
+    
     if (!selectedInterviewer) {
       set({ error: "Veuillez sélectionner un type de recruteur" });
       return null;
@@ -85,11 +86,12 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
         candidate_id: candidateId || undefined,
         job_description: jobDescription.trim() || undefined,
       });
-
+      
       set({ isStarting: false });
       return data.session_id;
     } catch (err) {
       console.error("Error starting interview:", err);
+      
       if (err instanceof ApiError) {
         set({
           error:

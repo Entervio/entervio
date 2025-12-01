@@ -1,10 +1,13 @@
-import { Link, useLocation } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { Button } from "~/components/ui/button";
 import { cn } from "~/lib/utils";
 import { MessageSquare } from "lucide-react";
+import { useAuth } from "~/context/AuthContext";
 
 export function Navbar() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
   const isActive = (path: string) => {
     return location.pathname === path;
@@ -48,6 +51,23 @@ export function Navbar() {
             >
               <Link to="/account">Mon compte</Link>
             </Button>
+            {user ? (
+              <Button
+                variant="outline"
+                size="default"
+                type="button"
+                onClick={async () => {
+                  await logout();
+                  navigate("/login");
+                }}
+              >
+                Déconnexion
+              </Button>
+            ) : (
+              <Button asChild size="default" variant="default">
+                <Link to="/login">Connexion</Link>
+              </Button>
+            )}
           </div>
         </div>
       </div>
