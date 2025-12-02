@@ -25,14 +25,14 @@ Entervio is a modern, full-stack application that simulates realistic job interv
 
 -   **Frontend**: React (Vite), Tailwind CSS, Lucide Icons
 -   **Backend**: Python (FastAPI), SQLAlchemy, SQLite
--   **AI/ML**: OpenAI / Anthropic (LLM), ElevenLabs (TTS), Whisper (STT)
+-   **AI/ML**: Gemini, ElevenLabs/Edge (TTS), Whisper (STT)
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 -   Python 3.11+
 -   Node.js 18+
--   API Keys (OpenAI, ElevenLabs)
+-   API Keys (Gemini, ElevenLabs, Groq, Supabase)
 
 ### Backend Setup
 

@@ -4,7 +4,6 @@ import type { Route } from "./+types/interview";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { Alert, AlertDescription } from "~/components/ui/alert";
-import { Badge } from "~/components/ui/badge";
 import { INTERVIEWER_LABELS } from "~/types/interview";
 import { cn } from "~/lib/utils";
 import { useInterviewStore } from "~/services/useinterviewstore";
@@ -13,9 +12,7 @@ import {
   AlertTriangle,
   MessageSquare,
   User,
-  Building2,
   Info,
-  Volume2,
   Mic,
   CheckCircle2,
   RotateCcw,
@@ -35,7 +32,6 @@ export default function Interview() {
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Get state and actions from store
   const {
     sessionId,
     candidateName,

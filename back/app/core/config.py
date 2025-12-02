@@ -1,7 +1,5 @@
-# app/core/config.py
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
-from typing import Optional
 from pydantic import Field
 
 class Settings(BaseSettings):
@@ -15,8 +13,11 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
-    # Database
-    DATABASE_URL: str = "sqlite:///./interview_platform.db"
+    # Database - Now supports PostgreSQL
+    DATABASE_URL: str = Field(
+        default="postgresql://entervio_user:password@localhost:5432/entervio",
+        env="DATABASE_URL"
+    )
     
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = [
@@ -34,14 +35,22 @@ class Settings(BaseSettings):
     # AI Services
     ANTHROPIC_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
-    ELEVENLABS_API_KEY: str = ""
-
-    ELEVENLABS_VOICE_ID: str = "imRmmzTqlLHt9Do1HufF"
     GROQ_API_KEY: str = Field(default="", env="GROQ_API_KEY")
     GEMINI_API_KEY: str = Field(default="", env="GEMINI_API_KEY")
+    
+    # TTS Provider Selection
+    USE_ELEVENLABS: bool = Field(default=False, env="USE_ELEVENLABS")
+    
+    # ElevenLabs TTS (only used if USE_ELEVENLABS=true)
+    ELEVENLABS_API_KEY: str = ""
+    ELEVENLABS_VOICE_ID: str = "imRmmzTqlLHt9Do1HufF"
+    
+    # Edge TTS (only used if USE_ELEVENLABS=false)
     TTS_VOICE: str = Field(default="fr-FR-DeniseNeural")
     TTS_RATE: str = Field(default="+0%")
     TTS_VOLUME: str = Field(default="+0%")
+    
+    # WebSocket
     WS_HEARTBEAT_INTERVAL: int = Field(default=30)
     
     model_config = SettingsConfigDict(

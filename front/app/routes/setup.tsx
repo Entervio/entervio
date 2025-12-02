@@ -1,17 +1,7 @@
 import { useNavigate } from "react-router";
 import type { Route } from "./+types/setup";
-import { Layout } from "~/components/layout/Layout";
 import { Button } from "~/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "~/components/ui/card";
-import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { Alert, AlertDescription } from "~/components/ui/alert";
 import type { InterviewerType } from "~/types/interview";
 import { cn } from "~/lib/utils";
 import { useSetupStore } from "~/services/usesetupstore";
@@ -66,15 +56,12 @@ const INTERVIEWER_CONFIGS = [
 export default function Setup() {
   const navigate = useNavigate();
 
-  // Get state and actions from store
   const {
-    candidateName,
     selectedInterviewer,
     candidateId,
     error,
     isStarting,
     isUploading,
-    setCandidateName,
     setSelectedInterviewer,
     uploadResume,
     startInterview,
@@ -218,7 +205,7 @@ export default function Setup() {
             <div className="pt-4">
               <Button
                 onClick={handleStart}
-                disabled={!candidateName.trim() || !selectedInterviewer || isStarting}
+                disabled={!selectedInterviewer || isStarting}
                 className="w-full md:w-auto text-base h-12 px-8"
                 size="lg"
               >
