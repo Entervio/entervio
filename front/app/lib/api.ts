@@ -368,10 +368,24 @@ export const interviewApi = {
       withAuthHeaders(),
     );
 
+    return response.json();
+  },
+
+  /**
+   * Perform smart job search based on user resume
+   */
+  async smartSearchJobs(): Promise<any> {
+    const response = await fetch(
+      `${API_BASE_URL}/jobs/smart-search`,
+      withAuthHeaders({
+        method: "POST",
+      })
+    );
+
     if (!response.ok) {
       throw new ApiError(
         response.status,
-        `Failed to search jobs: ${response.status}`
+        `Failed to perform smart search: ${response.status}`
       );
     }
 

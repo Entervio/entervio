@@ -3,6 +3,8 @@ from typing import Any, Dict
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
+from app.db.database import get_db
+
 import logging
 
 from app.core.config import settings
@@ -58,3 +60,51 @@ async def get_current_user(
     token = credentials.credentials
     claims = decode_supabase_token(token)
     return claims
+
+
+
+def get_current_db_user(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db: Any = Depends(get_db),
+) -> Any:
+    """
+    Dependency that returns the local DB user.
+    If the user exists in Supabase (valid token) but not in local DB,
+    it creates the local user record automatically.
+    """
+    # Avoid circular imports
+    from app.models.user import User
+
+    supabase_id = current_user.get("sub")
+    if not supabase_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Supabase token: missing subject",
+        )
+
+    user = db.query(User).filter(User.supabase_id == supabase_id).first()
+    
+    if not user:
+        # Lazy creation
+        logger.info(f"User {supabase_id} not found in local DB. Creating...")
+        
+        # Extract metadata if available, otherwise use defaults
+        user_metadata = current_user.get("user_metadata", {})
+        email = current_user.get("email")
+        
+        if not email:
+             # Should not happen with valid JWTs usually
+             raise HTTPException(status_code=400, detail="Email missing in token")
+
+        new_user = User(
+            supabase_id=supabase_id,
+            email=email,
+            name=user_metadata.get("name", email.split("@")[0]), # Fallback name
+            phone=user_metadata.get("phone"),
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        return new_user
+
+    return user

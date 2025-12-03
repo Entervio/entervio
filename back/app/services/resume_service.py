@@ -79,7 +79,13 @@ class ResumeParserService:
         "skills": {{
             "technical": ["string"],
             "soft": ["string"]
-        }}
+        }},
+        "search_keywords": [
+            {{
+                "keywords": "string (single strong keyword)",
+                "type": "skill|role|tool"
+            }}
+        ]
         }}
 
         RESUME TEXT:

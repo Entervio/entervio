@@ -11,14 +11,14 @@ from app.services.interview_service import interview_service
 from app.models.user import User
 from app.db import get_db
 from app.schemas import StartInterviewRequest
-from app.core.auth import get_current_user
+from app.core.auth import get_current_db_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get("/")
 async def get_interviews(
-    current_user: dict = Depends(get_current_user),
+    user: User = Depends(get_current_db_user),
     db: Session = Depends(get_db),
     ) -> List[Dict]:
     """
@@ -32,30 +32,16 @@ async def get_interviews(
     Returns:
         List of interviews with id, candidate_id, interviewer_style, question_count, and average grade
     """
-    supabase_id = current_user.get("sub")
-    if not supabase_id:
-        raise HTTPException(status_code=401, detail="Invalid Supabase token: missing subject")
-
-    user = db.query(User).filter(User.supabase_id == supabase_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found for Supabase ID")
     return interview_service.get_interview_list(db, user.id)
 
 @router.post("/start")
 async def start_interview(
     request: StartInterviewRequest,
-    current_user: dict = Depends(get_current_user),
+    user: User = Depends(get_current_db_user),
     db: Session = Depends(get_db)
 ):
     """Start a new interview session."""
     try:
-        supabase_id = current_user.get("sub")
-        if not supabase_id:
-            raise HTTPException(status_code=401, detail="Invalid Supabase token: missing subject")
-
-        user = db.query(User).filter(User.supabase_id == supabase_id).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found for Supabase ID")
         result = await interview_service.start_interview(
             db=db,
             user=user,

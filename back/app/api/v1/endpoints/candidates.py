@@ -3,9 +3,8 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.models.user import User
 from app.services.resume_service import resume_service_instance
-from app.core.auth import get_current_user
+from app.core.auth import get_current_db_user
 import logging
-
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -13,7 +12,7 @@ logger = logging.getLogger(__name__)
 async def upload_resume(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    user: User = Depends(get_current_db_user),
 ):
     """
     Upload a resume (PDF), parse it, and create a candidate profile.
@@ -26,26 +25,19 @@ async def upload_resume(
         file_content = await file.read()
         
         # Parse resume using existing service
-        # Note: extract_text_from_stream expects a file-like object
         import io
         file_stream = io.BytesIO(file_content)
         
         raw_text = resume_service_instance.extract_text_from_stream(file_stream)
+        print(raw_text," hh")
         if not raw_text:
              raise HTTPException(status_code=400, detail="Could not extract text from PDF")
              
         parsed_data = resume_service_instance.extract_data_with_llm(raw_text)
+        print(parsed_data," hh")
         
         if "error" in parsed_data:
              raise HTTPException(status_code=500, detail=parsed_data["error"])
-        
-        supabase_id = current_user.get("sub")
-        if not supabase_id:
-            raise HTTPException(status_code=401, detail="Invalid Supabase token: missing subject")
-
-        user = db.query(User).filter(User.supabase_id == supabase_id).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found for Supabase ID")
 
         user.skills = parsed_data.get("skills")
         user.experience = parsed_data.get("work_experience")

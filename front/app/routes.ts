@@ -16,7 +16,6 @@ export default [
     route("interview/:interviewId/feedback", "routes/feedback.tsx"),
     route("jobs", "routes/jobs/layout.tsx", [
       index("routes/jobs/search.tsx"),
-      route("insights", "routes/jobs/insights.tsx"),
     ]),
   ]),
 ] satisfies RouteConfig;
