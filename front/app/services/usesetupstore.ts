@@ -17,6 +17,7 @@ interface SetupStore {
   setError: (error: string | null) => void;
   uploadResume: (file: File) => Promise<void>;
   startInterview: () => Promise<string | null>; // Returns session_id on success
+  fetchUserProfile: () => Promise<void>;
   reset: () => void;
 }
 
@@ -45,9 +46,26 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
     set({ error });
   },
 
+  fetchUserProfile: async () => {
+    try {
+      const { authApi } = await import("~/lib/api");
+      const user = await authApi.getMe();
+      if (user.has_resume && user.candidate_id) {
+        set({
+          candidateId: user.candidate_id,
+          candidateName: user.name || get().candidateName
+        });
+      } else if (user.name) {
+        set({ candidateName: user.name });
+      }
+    } catch (err) {
+      console.error("Failed to fetch user profile:", err);
+    }
+  },
+
   uploadResume: async (file) => {
     set({ isUploading: true, error: null });
-    
+
     try {
       const data = await interviewApi.uploadResume(file);
       set({
@@ -66,7 +84,7 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
 
   startInterview: async () => {
     const { candidateName, selectedInterviewer, candidateId, jobDescription } = get();
-    
+
     if (!selectedInterviewer) {
       set({ error: "Veuillez sélectionner un type de recruteur" });
       return null;
@@ -81,12 +99,12 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
         candidate_id: candidateId || undefined,
         job_description: jobDescription.trim() || undefined,
       });
-      
+
       set({ isStarting: false });
       return data.session_id;
     } catch (err) {
       console.error("Error starting interview:", err);
-      
+
       if (err instanceof ApiError) {
         set({
           error:

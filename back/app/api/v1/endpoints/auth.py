@@ -8,6 +8,7 @@ import httpx
 from app.core.config import settings
 from app.db.database import get_db
 from app.models.user import User
+from app.core.auth import get_current_db_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -94,3 +95,25 @@ async def signup(payload: SignupRequest, db: Session = Depends(get_db)):
     db.refresh(user)
 
     return SignupResponse(id=user.id, email=user.email, name=user.name)
+
+
+class UserProfileResponse(BaseModel):
+    id: int
+    email: EmailStr
+    name: str
+    has_resume: bool
+    candidate_id: Optional[int] = None
+
+
+@router.get("/me", response_model=UserProfileResponse)
+async def get_me(user: User = Depends(get_current_db_user)):
+    """
+    Get current user profile.
+    """
+    return UserProfileResponse(
+        id=user.id,
+        email=user.email,
+        name=user.name,
+        has_resume=bool(user.parsed_data),
+        candidate_id=user.id if user.parsed_data else None
+    )

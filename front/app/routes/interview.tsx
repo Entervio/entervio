@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import type { Route } from "./+types/interview";
 import { Button } from "~/components/ui/button";
@@ -10,14 +10,12 @@ import { useInterviewStore } from "~/services/useinterviewstore";
 import {
   Loader2,
   AlertTriangle,
-  MessageSquare,
-  User,
-  Info,
   Mic,
-  CheckCircle2,
-  RotateCcw,
   X,
   StopCircle,
+  PhoneOff,
+  Volume2,
+  MoreVertical,
 } from "lucide-react";
 
 export function meta({ }: Route.MetaArgs) {
@@ -31,6 +29,7 @@ export default function Interview() {
   const { interviewId } = useParams();
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [showTranscript, setShowTranscript] = useState(false);
 
   const {
     sessionId,
@@ -50,7 +49,6 @@ export default function Interview() {
     endInterview,
     setError,
     cleanup,
-    reset,
   } = useInterviewStore();
 
   useEffect(() => {
@@ -64,13 +62,11 @@ export default function Interview() {
       navigate("/");
     }
 
-    // Cleanup on unmount
     return () => {
       cleanup();
     };
   }, [interviewId, navigate, loadInterviewData, cleanup]);
 
-  // Auto-scroll messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -78,11 +74,6 @@ export default function Interview() {
   const handleEndInterview = async () => {
     await endInterview();
     navigate(`/interview/${sessionId}/feedback`);
-  };
-
-  const restartInterview = () => {
-    reset();
-    navigate("/setup");
   };
 
   if (isLoading) {
@@ -109,14 +100,7 @@ export default function Interview() {
             <h2 className="text-xl font-semibold text-foreground mb-2">
               Session introuvable
             </h2>
-            <p className="text-muted-foreground mb-8">
-              Cette session d'entretien n'existe pas ou a expiré.
-            </p>
-            <Button
-              onClick={() => navigate("/")}
-              variant="outline"
-              className="rounded-full px-8"
-            >
+            <Button onClick={() => navigate("/")} variant="outline" className="mt-6 rounded-full px-8">
               Retour à l'accueil
             </Button>
           </CardContent>
@@ -125,220 +109,149 @@ export default function Interview() {
     );
   }
 
-  const interviewerInfo =
-    INTERVIEWER_LABELS[interviewerType] || INTERVIEWER_LABELS.neutral;
+  const interviewerInfo = INTERVIEWER_LABELS[interviewerType] || INTERVIEWER_LABELS.neutral;
+  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+  const lastInterviewerMessage = messages.slice().reverse().find(m => m.role === "assistant");
 
   return (
-    <div className="min-h-screen w-full bg-background flex flex-col font-sans text-foreground selection:bg-primary/20">
+    <div className="min-h-screen w-full bg-background flex flex-col font-sans text-foreground overflow-hidden relative">
+
+      {/* Ambient Background */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-secondary/20 via-background to-background pointer-events-none" />
 
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/40">
-        <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-primary/5 flex items-center justify-center text-xl ring-1 ring-border/50">
-              {interviewerInfo.icon}
-            </div>
-            <div>
-              <h1 className="font-medium text-lg leading-none mb-1 tracking-tight">
-                {interviewerInfo.name}
-              </h1>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
-                <span className={cn("flex items-center gap-1.5", sessionId ? "text-emerald-500" : "text-muted-foreground")}>
-                  <span className={cn("w-1.5 h-1.5 rounded-full", sessionId ? "bg-emerald-500" : "bg-muted-foreground")} />
-                  {sessionId ? "En ligne" : "Hors ligne"}
-                </span>
-                <span className="text-border">•</span>
-                <span>Entretien IA</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            {interviewStarted && (
-              <div className="flex flex-col items-end">
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Progression</span>
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className={cn(
-                        "w-8 h-1 rounded-full transition-all duration-500",
-                        i < questionCount
-                          ? "bg-primary shadow-[0_0_8px_rgba(var(--primary),0.4)]"
-                          : "bg-muted/50"
-                      )}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+      <header className="absolute top-0 left-0 right-0 z-50 p-6 flex justify-between items-center">
+        <div className="flex items-center gap-3 bg-background/50 backdrop-blur-md px-4 py-2 rounded-full border border-border/50 shadow-sm">
+          <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+          <span className="text-sm font-medium text-foreground/80">En direct</span>
+          <span className="text-border mx-1">|</span>
+          <span className="text-sm text-muted-foreground">{questionCount} questions posées</span>
         </div>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className="rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
+          onClick={handleEndInterview}
+        >
+          <PhoneOff className="w-5 h-5" />
+        </Button>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 container mx-auto px-4 py-8 max-w-6xl flex flex-col lg:flex-row gap-12">
+      {/* Main Focus Area */}
+      <main className="flex-1 flex flex-col items-center justify-center relative z-10 px-6 max-w-4xl mx-auto w-full">
 
-        {/* Chat Area */}
-        <div className="flex-1 flex flex-col h-[calc(100vh-10rem)] relative">
-
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto pr-4 space-y-8 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
-            {messages.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-0 animate-in fade-in duration-1000 slide-in-from-bottom-4">
-                <div className="w-20 h-20 bg-primary/5 rounded-3xl flex items-center justify-center mb-6 ring-1 ring-primary/10">
-                  <MessageSquare className="w-10 h-10 text-primary/40" />
-                </div>
-                <h3 className="text-2xl font-light tracking-tight mb-3">L'entretien va commencer</h3>
-                <p className="text-muted-foreground max-w-sm mx-auto text-lg font-light leading-relaxed">
-                  Le recruteur prépare sa première question. Installez-vous confortablement.
-                </p>
-              </div>
+        {/* Avatar / Visualizer */}
+        <div className="mb-12 relative">
+          <div className={cn(
+            "w-32 h-32 md:w-40 md:h-40 rounded-full flex items-center justify-center text-4xl shadow-2xl transition-all duration-500",
+            isPlayingAudio
+              ? "bg-primary text-primary-foreground scale-110 shadow-primary/30 ring-4 ring-primary/20"
+              : "bg-white text-foreground border border-border shadow-lg"
+          )}>
+            {isPlayingAudio ? (
+              <Volume2 className="w-12 h-12 animate-pulse" />
             ) : (
-              <>
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={cn(
-                      "flex w-full animate-in fade-in slide-in-from-bottom-4 duration-500",
-                      message.role === "user" ? "justify-end" : "justify-start"
-                    )}
-                  >
-                    <div className={cn("flex max-w-[85%] lg:max-w-[75%] gap-4", message.role === "user" ? "flex-row-reverse" : "flex-row")}>
-                      {/* Avatar */}
-                      <div className="shrink-0 mt-1">
-                        <div className={cn(
-                          "w-10 h-10 rounded-xl flex items-center justify-center text-sm shadow-sm ring-1 ring-border/50",
-                          message.role === "user"
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-card text-foreground"
-                        )}>
-                          {message.role === "user" ? <User className="w-5 h-5" /> : interviewerInfo.icon}
-                        </div>
-                      </div>
-
-                      {/* Bubble */}
-                      <div className={cn(
-                        "p-6 rounded-3xl text-[15px] leading-relaxed shadow-sm ring-1",
-                        message.role === "user"
-                          ? "bg-primary text-primary-foreground rounded-tr-sm ring-primary/50"
-                          : "bg-card text-foreground rounded-tl-sm ring-border/50"
-                      )}>
-                        <p className="whitespace-pre-wrap font-light tracking-wide">
-                          {message.text}
-                        </p>
-                        <span className={cn(
-                          "text-[10px] mt-3 block font-medium uppercase tracking-wider opacity-60",
-                          message.role === "user" ? "text-primary-foreground" : "text-muted-foreground"
-                        )}>
-                          {message.timestamp.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                <div ref={messagesEndRef} className="h-4" />
-              </>
+              <span className="text-5xl">{interviewerInfo.icon}</span>
             )}
           </div>
 
-          {/* Status Bar */}
-          {(isPlayingAudio || isProcessing) && (
-            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 mb-6 flex items-center gap-3 px-5 py-2.5 rounded-full bg-background/90 backdrop-blur-xl border border-border/50 shadow-lg text-xs font-medium animate-in fade-in slide-in-from-bottom-4">
-              {isPlayingAudio ? (
-                <>
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                  </span>
-                  <span className="text-foreground/80">Le recruteur parle...</span>
-                </>
-              ) : (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
-                  <span className="text-foreground/80">Traitement en cours...</span>
-                </>
-              )}
+          {/* Ripple Effect when talking */}
+          {isPlayingAudio && (
+            <>
+              <div className="absolute inset-0 rounded-full border border-primary/30 animate-[ping_2s_ease-in-out_infinite]" />
+              <div className="absolute inset-0 rounded-full border border-primary/20 animate-[ping_2s_ease-in-out_infinite_0.5s]" />
+            </>
+          )}
+        </div>
+
+        {/* Current Question / Context */}
+        <div className="text-center space-y-6 max-w-2xl">
+          {lastInterviewerMessage ? (
+            <h2 className="text-2xl md:text-3xl lg:text-4xl font-serif font-medium leading-tight text-foreground animate-in fade-in slide-in-from-bottom-4 duration-700">
+              {lastInterviewerMessage.text}
+            </h2>
+          ) : (
+            <h2 className="text-2xl md:text-3xl font-serif font-medium text-muted-foreground animate-pulse">
+              Le recruteur prépare sa question...
+            </h2>
+          )}
+
+          {/* Live Transcript / User Feedback */}
+          {isRecording && (
+            <div className="mt-8 p-4 rounded-2xl bg-secondary/10 border border-secondary/20 text-secondary-foreground animate-in fade-in zoom-in-95 duration-300">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <Mic className="w-4 h-4 animate-pulse" />
+                <span className="text-xs font-bold uppercase tracking-wider">Écoute en cours</span>
+              </div>
+              <p className="text-lg font-light italic opacity-80">"..."</p>
             </div>
           )}
         </div>
 
-        {/* Sidebar Controls */}
-        <div className="w-full lg:w-80 space-y-8 pt-4">
-
-          {/* Actions */}
-          <div className="space-y-4">
-            <Button
-              onClick={isRecording ? stopRecording : startRecording}
-              disabled={!sessionId || isProcessing || !interviewStarted || isPlayingAudio}
-              className={cn(
-                "w-full h-16 text-lg font-medium rounded-2xl shadow-sm transition-all duration-300",
-                isRecording
-                  ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground shadow-destructive/20 ring-4 ring-destructive/10"
-                  : "bg-primary hover:bg-primary/90 text-primary-foreground shadow-primary/20 hover:shadow-primary/30 hover:-translate-y-0.5"
-              )}
-            >
-              {isRecording ? (
-                <div className="flex items-center gap-3">
-                  <StopCircle className="w-6 h-6 fill-current animate-pulse" />
-                  <span>Arrêter</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <Mic className="w-6 h-6" />
-                  <span>{isProcessing ? "Traitement..." : "Répondre"}</span>
-                </div>
-              )}
-            </Button>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                onClick={handleEndInterview}
-                disabled={!sessionId || !interviewStarted || messages.length < 2 || isProcessing}
-                variant="outline"
-                className="h-12 rounded-xl border-border/50 hover:bg-destructive/5 hover:text-destructive hover:border-destructive/20 transition-colors"
-              >
-                <CheckCircle2 className="w-4 h-4 mr-2" />
-                Terminer
-              </Button>
-
-              {!interviewStarted && messages.length > 0 && (
-                <Button
-                  onClick={restartInterview}
-                  variant="outline"
-                  className="h-12 rounded-xl border-border/50 hover:bg-muted/50 transition-colors"
-                >
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  Recommencer
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Instructions */}
-          <div className="px-6 py-6 rounded-2xl bg-muted/30 border border-border/40">
-            <div className="flex items-center gap-2 mb-4 text-foreground/80">
-              <Info className="w-4 h-4" />
-              <h3 className="font-medium text-sm tracking-wide uppercase">Conseils</h3>
-            </div>
-            <ul className="space-y-4 text-sm text-muted-foreground font-light leading-relaxed">
-              <li className="flex gap-3 items-start">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0 opacity-60" />
-                <span>Prenez le temps d'écouter la question en entier.</span>
-              </li>
-              <li className="flex gap-3 items-start">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0 opacity-60" />
-                <span>Parlez clairement après avoir cliqué sur <strong>Répondre</strong>.</span>
-              </li>
-              <li className="flex gap-3 items-start">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0 opacity-60" />
-                <span>Soyez concis et structuré dans vos réponses.</span>
-              </li>
-            </ul>
-          </div>
-
-        </div>
       </main>
+
+      {/* Floating Control Bar */}
+      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-6">
+        <div className="bg-white/90 backdrop-blur-xl border border-border/50 shadow-[0_8px_32px_rgba(0,0,0,0.12)] rounded-2xl p-2 flex items-center justify-between gap-2">
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-xl text-muted-foreground hover:text-foreground"
+            onClick={() => setShowTranscript(!showTranscript)}
+          >
+            <MoreVertical className="w-5 h-5" />
+          </Button>
+
+          <Button
+            size="lg"
+            onClick={isRecording ? stopRecording : startRecording}
+            disabled={!sessionId || isProcessing || !interviewStarted || isPlayingAudio}
+            className={cn(
+              "flex-1 h-14 rounded-xl text-lg font-medium shadow-lg transition-all duration-300",
+              isRecording
+                ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                : "bg-primary hover:bg-primary/90 text-primary-foreground"
+            )}
+          >
+            {isRecording ? (
+              <div className="flex items-center gap-2">
+                <StopCircle className="w-5 h-5 fill-current animate-pulse" />
+                <span>Terminer la réponse</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Mic className="w-5 h-5" />
+                <span>{isProcessing ? "Analyse..." : "Répondre"}</span>
+              </div>
+            )}
+          </Button>
+
+          <div className="w-10" /> {/* Spacer for balance if needed, or add another button */}
+        </div>
+      </div>
+
+      {/* Transcript Drawer / Overlay (Optional) */}
+      {showTranscript && (
+        <div className="absolute inset-x-0 bottom-0 top-24 bg-background/95 backdrop-blur-sm z-40 border-t border-border rounded-t-3xl shadow-2xl p-6 overflow-y-auto animate-in slide-in-from-bottom-full duration-500">
+          <div className="max-w-2xl mx-auto space-y-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-serif text-xl">Transcription</h3>
+              <Button variant="ghost" size="sm" onClick={() => setShowTranscript(false)}>Fermer</Button>
+            </div>
+            {messages.map((m) => (
+              <div key={m.id} className={cn("flex flex-col gap-1", m.role === "user" ? "items-end" : "items-start")}>
+                <span className="text-xs text-muted-foreground uppercase tracking-wider">{m.role === "user" ? "Vous" : interviewerInfo.name}</span>
+                <div className={cn("p-4 rounded-2xl max-w-[85%]", m.role === "user" ? "bg-secondary/20 text-secondary-foreground" : "bg-muted text-foreground")}>
+                  {m.text}
+                </div>
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+        </div>
+      )}
 
       {/* Error Toast */}
       {error && (

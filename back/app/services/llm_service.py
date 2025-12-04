@@ -146,7 +146,7 @@ class LLMService:
         """Create a gemini model to grade the user responses"""
         system_prompt = get_system_prompt(interviewer_type)
         return genai.GenerativeModel(
-            'gemini-2.0-flash-lite',
+            'gemini-2.0-flash-lite-preview-02-05',
             system_instruction=system_prompt,
             generation_config={
                 "response_mime_type": "application/json"
