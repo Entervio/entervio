@@ -416,6 +416,31 @@ export const interviewApi = {
   },
 };
 
+export const api = {
+  get: async (url: string, init?: RequestInit) => {
+    const response = await fetch(`${API_BASE_URL}${url}`, withAuthHeaders(init));
+    if (!response.ok) {
+      throw new ApiError(response.status, `GET ${url} failed: ${response.status}`);
+    }
+    return { data: await response.json() };
+  },
+  post: async (url: string, body: any, init?: RequestInit) => {
+    const response = await fetch(`${API_BASE_URL}${url}`, withAuthHeaders({
+      ...init,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+      body: JSON.stringify(body),
+    }));
+    if (!response.ok) {
+      throw new ApiError(response.status, `POST ${url} failed: ${response.status}`);
+    }
+    return { data: await response.json() };
+  },
+};
+
 export const authApi = {
   async signup(payload: SignupRequest): Promise<SignupResponse> {
     const response = await fetch(`${API_BASE_URL}/auth/signup`, {

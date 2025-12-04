@@ -1,6 +1,7 @@
 """LLM Service using Google Gemini for Interview Scenarios"""
 import google.generativeai as genai
-from typing import List, Dict, Literal
+from typing import List, Dict, Literal, Any
+import numpy as np
 import logging
 from app.core.config import settings
 import json
@@ -145,7 +146,7 @@ class LLMService:
         """Create a gemini model to grade the user responses"""
         system_prompt = get_system_prompt(interviewer_type)
         return genai.GenerativeModel(
-            'gemini-2.5-flash-lite',
+            'gemini-2.0-flash-lite',
             system_instruction=system_prompt,
             generation_config={
                 "response_mime_type": "application/json"
@@ -396,6 +397,87 @@ Présentez-vous. Et soyez synthétique."""
         except Exception as e:
             logger.error(f"❌ Error generating feedback: {str(e)}")
             raise
+
+    async def compute_similarity_ranking(
+        self,
+        candidate_profile: str,
+        jobs: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Rerank jobs using Embeddings and Cosine Similarity (RAG approach).
+        """
+        logger.info(f"⚖️ Reranking {len(jobs)} jobs using Embeddings...")
+        
+        if not jobs:
+            return []
+
+        try:
+            # 1. Embed Candidate Profile
+            # We use the text-embedding-004 model for better performance
+            profile_embedding_resp = genai.embed_content(
+                model="models/text-embedding-004",
+                content=candidate_profile,
+                task_type="retrieval_query"
+            )
+            profile_vector = np.array(profile_embedding_resp['embedding'])
+
+            # 2. Embed Jobs (Batching if necessary, but genai handles lists)
+            # Construct texts to embed: "Title: ... Description: ..."
+            job_texts = []
+            for job in jobs:
+                title = job.get("intitule", "")
+                desc = job.get("description", "")[:1000] # Truncate for safety
+                text = f"Title: {title}\nDescription: {desc}"
+                job_texts.append(text)
+
+            # Embed all jobs in one go (or batches of 100 if list is huge)
+            # API limit check might be needed for production, but fine for <100 jobs
+            jobs_embedding_resp = genai.embed_content(
+                model="models/text-embedding-004",
+                content=job_texts,
+                task_type="retrieval_document"
+            )
+            
+            job_vectors = np.array(jobs_embedding_resp['embedding'])
+
+            # 3. Compute Cosine Similarity
+            # Cosine Sim = (A . B) / (||A|| * ||B||)
+            # Since embeddings are usually normalized, dot product might suffice, 
+            # but let's be mathematically correct.
+            
+            norm_profile = np.linalg.norm(profile_vector)
+            
+            reranked_jobs = []
+            for i, job in enumerate(jobs):
+                job_vector = job_vectors[i]
+                norm_job = np.linalg.norm(job_vector)
+                
+                if norm_profile == 0 or norm_job == 0:
+                    similarity = 0.0
+                else:
+                    similarity = np.dot(profile_vector, job_vector) / (norm_profile * norm_job)
+                
+                # Normalize score to 0-100 for frontend consistency
+                score = int(similarity * 100)
+                
+                job["relevance_score"] = score
+                job["relevance_reasoning"] = "Matched via Vector Similarity"
+                reranked_jobs.append(job)
+
+            # 4. Sort
+            reranked_jobs.sort(key=lambda x: x["relevance_score"], reverse=True)
+            
+            logger.info("✅ Jobs reranked via Embeddings")
+            return reranked_jobs
+
+        except Exception as e:
+            logger.error(f"❌ Error in embedding reranking: {str(e)}")
+            # Fallback: return original list with 0 score
+            for job in jobs:
+                job["relevance_score"] = 0
+                job["relevance_reasoning"] = "Error in ranking"
+            return jobs
+
 
 # Singleton instance - initialized on first import
 _llm_service_instance = None
