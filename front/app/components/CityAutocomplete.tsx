@@ -12,22 +12,27 @@ export interface City {
 }
 
 interface CityAutocompleteProps {
-    value: string;
+    value?: string;
     onSelect: (city: City | null) => void;
     placeholder?: string;
     className?: string;
+    selectedCityCode?: string;
 }
 
-export function CityAutocomplete({ value, onSelect, placeholder = "Localisation...", className }: CityAutocompleteProps) {
-    const [query, setQuery] = useState(value);
+export function CityAutocomplete({ value, onSelect, placeholder = "Localisation...", className, selectedCityCode }: CityAutocompleteProps) {
+    const [query, setQuery] = useState(value || "");
     const [cities, setCities] = useState<City[]>([]);
     const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(-1);
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const isSelectionRef = useRef(false);
 
     // Update query when value prop changes (e.g. reset)
     useEffect(() => {
-        setQuery(value);
+        if (value !== undefined) {
+            setQuery(value);
+        }
     }, [value]);
 
     // Close list when clicking outside
@@ -45,12 +50,15 @@ export function CityAutocomplete({ value, onSelect, placeholder = "Localisation.
     useEffect(() => {
         if (query.length < 2) {
             setCities([]);
+            setOpen(false);
             return;
         }
 
-        // Don't search if the query matches the current value (avoid searching on selection)
-        // Actually, we might want to search if user edits. 
-        // Let's just search.
+        // If the update was caused by a selection, don't search
+        if (isSelectionRef.current) {
+            isSelectionRef.current = false;
+            return;
+        }
 
         const timer = setTimeout(async () => {
             setLoading(true);
@@ -62,6 +70,7 @@ export function CityAutocomplete({ value, onSelect, placeholder = "Localisation.
                     const data = await response.json();
                     setCities(data);
                     setOpen(true);
+                    setActiveIndex(-1); // Reset active index on new results
                 }
             } catch (error) {
                 console.error("Failed to fetch cities:", error);
@@ -74,18 +83,43 @@ export function CityAutocomplete({ value, onSelect, placeholder = "Localisation.
     }, [query]);
 
     const handleSelect = (city: City) => {
+        isSelectionRef.current = true;
         setQuery(city.nom);
         onSelect(city);
         setOpen(false);
+        setActiveIndex(-1);
     };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newValue = e.target.value;
         setQuery(newValue);
-        if (newValue === "") {
-            onSelect(null);
-        }
+        // Clear selection immediately when user types
+        onSelect(null);
         setOpen(true);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (!open || cities.length === 0) return;
+
+        switch (e.key) {
+            case "ArrowDown":
+                e.preventDefault();
+                setActiveIndex((prev) => (prev < cities.length - 1 ? prev + 1 : 0));
+                break;
+            case "ArrowUp":
+                e.preventDefault();
+                setActiveIndex((prev) => (prev > 0 ? prev - 1 : cities.length - 1));
+                break;
+            case "Enter":
+                e.preventDefault();
+                if (activeIndex >= 0 && activeIndex < cities.length) {
+                    handleSelect(cities[activeIndex]);
+                }
+                break;
+            case "Escape":
+                setOpen(false);
+                break;
+        }
     };
 
     return (
@@ -93,6 +127,7 @@ export function CityAutocomplete({ value, onSelect, placeholder = "Localisation.
             <Input
                 value={query}
                 onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
                 onFocus={() => {
                     if (cities.length > 0) setOpen(true);
                 }}
@@ -109,11 +144,15 @@ export function CityAutocomplete({ value, onSelect, placeholder = "Localisation.
                     )}
                     {!loading && (
                         <ul className="max-h-[200px] overflow-auto py-1">
-                            {cities.map((city) => (
+                            {cities.map((city, index) => (
                                 <li
                                     key={city.code}
-                                    className="px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground flex flex-col"
+                                    className={cn(
+                                        "px-3 py-2 text-sm cursor-pointer flex flex-col transition-colors",
+                                        index === activeIndex ? "bg-accent text-accent-foreground" : "hover:bg-accent hover:text-accent-foreground"
+                                    )}
                                     onClick={() => handleSelect(city)}
+                                    onMouseEnter={() => setActiveIndex(index)}
                                 >
                                     <span className="font-medium">{city.nom}</span>
                                     <span className="text-xs text-muted-foreground">{city.codesPostaux[0]} ({city.code})</span>
@@ -126,3 +165,4 @@ export function CityAutocomplete({ value, onSelect, placeholder = "Localisation.
         </div>
     );
 }
+
