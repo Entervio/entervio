@@ -9,6 +9,7 @@ import google.generativeai as genai
 import typst
 import tempfile
 from pathlib import Path
+from app.services.llm_service import llm_service
 
 from sqlalchemy.orm import Session
 from app.models.user import User
@@ -231,11 +232,9 @@ class ResumeParserService:
         }
         
         # 2. Call LLM to Tailor Content
-        from app.services.llm_service import llm_service
         if not llm_service.groq_client:
              raise ValueError("Groq client not initialized")
 
-        from app.services.llm_service import llm_service
 
         prompt = f"""
         Role: Expert Resume Writer.
