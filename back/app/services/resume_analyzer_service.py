@@ -55,6 +55,8 @@ class ResumeAnalyzerService:
 
     async def _analyze_with_llm(self, resume_text: str, job_description: str) -> Dict[str, Any]:
         """
+        Uses LLM to extract keywords AND provide strategic critique.
+        """
         try:
             if not llm_service.groq_client:
                  raise ValueError("Groq client not initialized")
