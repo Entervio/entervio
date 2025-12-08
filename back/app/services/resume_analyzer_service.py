@@ -4,14 +4,12 @@ import logging
 from typing import List, Dict, Any, Set
 from collections import Counter
 from app.services.llm_service import llm_service
-import google.generativeai as genai
+
 import json
 
 logger = logging.getLogger(__name__)
 
 class ResumeAnalyzerService:
-    def __init__(self):
-        self.common_stops = {"and", "the", "in", "of", "to", "a", "is", "for", "with", "on", "at", "by", "an", "be"}
 
     async def analyze_job_match(self, resume_text: str, job_description: str) -> Dict[str, Any]:
         """

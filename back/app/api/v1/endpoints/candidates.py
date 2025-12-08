@@ -4,6 +4,9 @@ from app.db.database import get_db
 from app.models.user import User
 from app.services.resume_service import resume_service_instance
 from app.core.auth import get_current_db_user
+from app.models.resume_models import WorkExperience, Education, Project, Language, Skill
+
+import io
 import logging
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -25,30 +28,17 @@ async def upload_resume(
         file_content = await file.read()
         
         # Parse resume using existing service
-        import io
         file_stream = io.BytesIO(file_content)
         
         raw_text = resume_service_instance.extract_text_from_stream(file_stream)
         if not raw_text:
              raise HTTPException(status_code=400, detail="Could not extract text from PDF")
              
-        parsed_data = resume_service_instance.extract_data_with_llm(raw_text)
+        parsed_data = await resume_service_instance.extract_data_with_llm(raw_text)
         
         if "error" in parsed_data:
              raise HTTPException(status_code=500, detail=parsed_data["error"])
 
-        # Clear existing resume data
-        from app.models.resume_models import WorkExperience, Education, Project, Language, Skill
-        
-        # We need to manually delete if we don't trust cascade or want to be explicit
-        # SQLAlchemy cascade should handle it if configured correctly on User side, 
-        # but let's be safe and clear old data.
-        db.query(WorkExperience).filter(WorkExperience.user_id == user.id).delete()
-        db.query(Education).filter(Education.user_id == user.id).delete()
-        db.query(Project).filter(Project.user_id == user.id).delete()
-        db.query(Language).filter(Language.user_id == user.id).delete()
-        db.query(Skill).filter(Skill.user_id == user.id).delete()
-        
         # Populate Work Experience
         for exp in parsed_data.get("work_experience", []):
             db.add(WorkExperience(

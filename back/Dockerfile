@@ -20,11 +20,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements file
-COPY requirements.txt .
+# Copy project configuration
+COPY pyproject.toml .
 
 # Install Python dependencies
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system -r requirements.txt
+    uv pip install --system -r pyproject.toml
 
 # Copy application code
 COPY . .

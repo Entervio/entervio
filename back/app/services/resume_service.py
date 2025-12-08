@@ -5,7 +5,7 @@ from typing import Dict, Any, List
 from app.core.config import settings
 import pdfplumber
 import spacy
-import google.generativeai as genai
+
 import typst
 import tempfile
 from pathlib import Path
@@ -15,8 +15,7 @@ from sqlalchemy.orm import Session
 from app.models.user import User
 from app.models.resume_models import WorkExperience, Education, Project, Language, Skill
 
-api_key = settings.GEMINI_API_KEY
-genai.configure(api_key=api_key)
+
 
 logger = logging.getLogger(__name__)
 
@@ -47,13 +46,12 @@ class ResumeParserService:
             return ""
         return text
 
-    def extract_data_with_llm(self, raw_text: str) -> Dict[str, Any]:
-        model = genai.GenerativeModel(
-            'gemini-2.0-flash-lite-preview-02-05',
-            generation_config={
-                "response_mime_type": "application/json"
-            }
-        )
+    async def extract_data_with_llm(self, raw_text: str) -> Dict[str, Any]:
+        """
+        Extracts structured data from resume text using Groq.
+        """
+        if not llm_service.groq_client:
+             raise ValueError("Groq client not initialized")
         
         prompt = f"""
         You are a strict Resume Parsing API. 
@@ -113,16 +111,23 @@ class ResumeParserService:
         }}
 
         RESUME TEXT:
-        {raw_text}
+        {raw_text[:25000]}
         """
         
         try:
-            response = model.generate_content(prompt)
-            # Sanitize response (remove markdown fences if the model adds them)
-            clean_json = response.text.strip().replace("```json", "").replace("```", "")
+            completion = llm_service.groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {"role": "system", "content": "You are a resume parser that outputs JSON."},
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"}
+            )
+            
+            clean_json = completion.choices[0].message.content
             return json.loads(clean_json)
         except Exception as e:
-            print(f"LLM Error: {e}")
+            logger.error(f"Groq Parsing Error: {e}")
             return {"error": "Failed to parse resume data"}
         
     def get_core_context(self, parsed_data: Dict[str, Any]) -> str:
