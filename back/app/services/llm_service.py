@@ -586,7 +586,7 @@ Présentez-vous. Et soyez synthétique."""
                             if isinstance(jobs, list):
                                 all_found_jobs.extend(jobs)
                         except Exception as e:
-                            logger.error(f"❌ Failed to parse jobs JSON from tool: {e}")
+                            logger.error(f"❌ Failed to parse jobs JSON from tool: {e}. Content: {jobs_json[:200]}...")
 
             logger.info(f"✅ Extracted {len(all_found_jobs)} jobs from tool execution")
             return all_found_jobs

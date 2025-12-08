@@ -49,4 +49,5 @@ async def search_jobs(
             
         return json.dumps(jobs[:20], default=str)
     except Exception as e:
-        return f"Error searching for jobs: {str(e)}"
+        print(f"Error searching for jobs: {str(e)}") # Log effectively
+        return "[]" # Return empty JSON list to avoid parse error

@@ -11,9 +11,9 @@ class WorkExperience(Base):
     company = Column(String, nullable=False)
     role = Column(String, nullable=False)
     location = Column(String, nullable=True)
-    start_date = Column(String, nullable=True) # Keeping as string 'YYYY-MM' for flexibility or Date if strict
+    start_date = Column(String, nullable=True) # Keeping as string 'YYYY-MM' for flexibility
     end_date = Column(String, nullable=True)
-    description = Column(Text, nullable=True) # Markdown or newlines for bullet points
+    description = Column(Text, nullable=True)
     
     user = relationship("User", back_populates="work_experiences")
 
