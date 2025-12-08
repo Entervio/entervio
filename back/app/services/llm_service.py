@@ -478,62 +478,7 @@ Présentez-vous. Et soyez synthétique."""
             return jobs
 
 
-    async def extract_keywords_from_query(self, query: str, user_context: str = "") -> Dict[str, Any]:
-        """
-        Extract search keywords and location from a natural language query using Groq/Llama3,
-        considering the user's professional context.
-        """
-        logger.info(f"🔍 Extracting keywords from query: '{query}' with context length: {len(user_context)}")
-        
-        try:
-            if not self.groq_client:
-                raise ValueError("Groq client not initialized")
-
-            prompt = f"""Role: You are an expert Technical Recruiter in France.
-                        Task: Analyze the user's profile and query to generate optimized search parameters for the French job market (France Travail / APEC).
-
-                        User Profile: {user_context}
-                        User Query: "{query}"
-
-                        Instructions:
-                        1. KEYWORDS: Extract the core job role and translate it into **Standard French Market Titles**.
-                        - Convert "Software Engineer" to "Ingénieur Logiciel" OR "Développeur".
-                        - Convert "Senior" to "Senior" OR "Confirmé".
-                        - Convert "Junior" to "Débutant" OR "Junior".
-                        2. EXPANSION: Generate an array of 3 distinct search variations ranging from specific to broad.
-                        - Variation 1: Precise Title (e.g., "Développeur React Senior")
-                        - Variation 2: Broader Title (e.g., "Ingénieur Frontend")
-                        - Variation 3: Tech Stack Focus (e.g., "React.js Confirmé")
-                        3. LOCATION: Extract the city name or zip code if explicitly mentioned.
-                        - CRITICAL: IF NO LOCATION IS MENTIONED IN THE QUERY, Do not include it.
-                        - DO NOT assume specific cities unless the user asks.
-
-                        Output JSON format strictly:
-                        {{
-                        "keywords": ["Variation 1", "Variation 2", "Variation 3"],
-                        "location": "Paris" or null,
-                        }}"""
-            
-            completion = self.groq_client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant that outputs JSON."},
-                    {"role": "user", "content": prompt}
-                ],
-                response_format={"type": "json_object"}
-            )
-            
-            result_text = completion.choices[0].message.content
-            result = json.loads(result_text)
-            
-            logger.info(f"✅ Extracted: {result}")
-            return result
-            
-        except Exception as e:
-            logger.error(f"❌ Error extracting keywords with Groq: {str(e)}")
-            # Fallback
-            return {"keywords": query.split()[:3], "location": None}
-
+    
     async def search_with_tools(self, user_query: str, user_context: str, tools: List[Any]) -> List[Dict]:
         """
         Perform a search using Groq tool calling (OpenAI compatible).
@@ -586,7 +531,7 @@ Présentez-vous. Et soyez synthétique."""
             messages = [
                 {
                     "role": "system",
-                    "content": f"You are a Job Search Agent. \nContext: {user_context}\n\nTask: Search for relevant jobs using the 'search_jobs' tool.\n\nSTRATEGY: To ensure results, you MUST call the 'search_jobs' tool 3 TIMES in parallel with different keyword variations:\n1. Exact fit (e.g. 'Développeur Python')\n2. Broader term (e.g. 'Développeur Back-end')\n3. Alternative/English term (e.g. 'Python API')\n\nCRITICAL: DO NOT INVENT A LOCATION. If the user doesn't specify one, OMIT the location parameter entirely.\n\nYou can also infer contract type (CDI/CDD) or full-time preference if explicitly stated."
+                    "content": f"You are a Job Search Agent. \nContext: {user_context}\n\nTask: Search for relevant jobs using the 'search_jobs' tool.\n\nSTRATEGY: To ensure results, you MUST call the 'search_jobs' tool many TIMES in parallel with different keyword variations:\n1. Exact fit (e.g. 'Développeur Python')\n2. Broader term (e.g. 'Développeur Back-end')\n3. Alternative/English term (e.g. 'Python API')\n\nCRITICAL: DO NOT INVENT A LOCATION. If the user doesn't specify one, OMIT the location parameter entirely.\n\nYou can also infer contract type (CDI/CDD) or full-time preference if explicitly stated."
 
                 },
                 {

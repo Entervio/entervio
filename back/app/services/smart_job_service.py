@@ -36,7 +36,7 @@ class SmartJobService:
             
         return "\n".join(parts) if parts else "No profile data available."
 
-    async def smart_search(self, user: User, location: Optional[str] = None, query: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def smart_search(self, user: User, query: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Performs a smart job search for the user.
         
@@ -51,8 +51,6 @@ class SmartJobService:
         profile_summary = self._build_profile_summary(user)
         
         # 3. Use LLM with Tools
-        # We pass the underlying function (.fn) because fastmcp wraps it in a Tool object
-        # that Gemini's SDK doesn't natively recognize as a callable/tool.
         tools = [search_jobs.fn]
         
         found_jobs = await llm_service.search_with_tools(query or "Find jobs matching my profile", profile_summary, tools)

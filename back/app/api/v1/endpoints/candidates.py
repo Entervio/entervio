@@ -94,7 +94,7 @@ async def upload_resume(
         # Update user contact info if extracted
         contact = parsed_data.get("contact_info", {})
         if contact.get("phone"): user.phone = contact.get("phone")
-        if contact.get("email"): user.email = contact.get("email") # Careful overwriting email? Maybe only if missing.
+        if contact.get("email"): user.email = contact.get("email")
         if contact.get("name"): user.name = contact.get("name")
 
         db.add(user)
