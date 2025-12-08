@@ -358,6 +358,11 @@ function JobDetail({ job }: { job: JobOffer | null }) {
                                 <Sparkles className="w-4 h-4 text-emerald-700" />
                             </div>
                             <h3 className="font-bold text-emerald-900 text-sm uppercase tracking-wide">Pourquoi ça matche</h3>
+                            {job.relevance_score !== undefined && (
+                                <span className="ml-auto bg-emerald-100 text-emerald-800 text-xs font-bold px-2.5 py-0.5 rounded-full">
+                                    {job.relevance_score}% Match
+                                </span>
+                            )}
                         </div>
                         <div className="prose prose-sm max-w-none text-emerald-900/80 leading-relaxed">
                             <p>{job.relevance_reasoning}</p>

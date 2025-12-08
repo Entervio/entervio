@@ -64,7 +64,10 @@ class SmartJobService:
         # 4. Filter and Deduplicate (if multiple tool calls happened, the service should handle aggregation)
         # But if search_with_tools returns the aggregated jobs, we are good.
         
-        return found_jobs
+        # 5. Rerank
+        reranked_jobs = await llm_service.compute_similarity_ranking(profile_summary, found_jobs)
+        
+        return reranked_jobs
 
     def _get_search_keywords(self, user: User) -> List[str]:
         """Extracts top keywords from user's relational data."""
