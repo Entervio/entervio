@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from app.models.interview import InterviewerStyle
 
@@ -17,9 +17,7 @@ class QuestionAnswerUpdate(BaseModel):
 class QuestionAnswer(QuestionAnswerBase):
     id: int
     interview_id: int
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class StartInterviewRequest(BaseModel):
     interviewer_type: InterviewerStyle
@@ -39,6 +37,4 @@ class InterviewUpdate(BaseModel):
 class Interview(InterviewBase):
     id: int
     question_answers: List[QuestionAnswer] = []
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
