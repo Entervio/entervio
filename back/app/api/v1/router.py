@@ -1,11 +1,7 @@
 # app/api/v1/router.py
 from fastapi import APIRouter, Depends
-from app.api.v1.endpoints import interviews
-from app.api.v1.endpoints import voice_chat
-from app.api.v1.endpoints import candidates
-from app.api.v1.endpoints import auth
-from app.api.v1.endpoints import jobs
-from app.api.v1.endpoints import resume
+
+from app.api.v1.endpoints import auth, candidates, interviews, jobs, resume, voice_chat
 from app.core.auth import get_current_user
 
 api_router = APIRouter()

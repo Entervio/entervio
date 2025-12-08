@@ -1,14 +1,16 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+import logging
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
+
+from app.core.auth import get_current_db_user
 from app.db.database import get_db
 from app.models.user import User
 from app.services.resume_service import resume_service_instance
-from app.core.auth import get_current_db_user
 
-import io
-import logging
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
 
 @router.post("/upload_resume")
 async def upload_resume(

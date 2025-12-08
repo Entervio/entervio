@@ -1,17 +1,19 @@
+from typing import Any
+
 import httpx
-from typing import List, Dict, Any
+
 
 class LocationService:
     GEO_API_URL = "https://geo.api.gouv.fr/communes"
 
-    async def search_cities(self, query: str) -> List[Dict[str, Any]]:
+    async def search_cities(self, query: str) -> list[dict[str, Any]]:
         if not query or len(query) < 2:
             return []
 
         params = {
             "fields": "nom,code,codesPostaux,departement,region",
             "boost": "population",
-            "limit": 10
+            "limit": 10,
         }
 
         if query.isdigit() and len(query) == 5:
@@ -27,5 +29,6 @@ class LocationService:
             except Exception as e:
                 print(f"Error fetching cities: {e}")
                 return []
+
 
 location_service = LocationService()

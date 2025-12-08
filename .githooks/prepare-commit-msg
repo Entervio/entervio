@@ -1,0 +1,23 @@
+#!/bin/bash
+
+COMMIT_MSG_FILE=$1
+COMMIT_SOURCE=$2
+
+# Add issue number for regular commits and commits with -m flag
+# Skip for merge, squash, amend, etc.
+if [ -z "$COMMIT_SOURCE" ] || [ "$COMMIT_SOURCE" = "message" ]; then
+    # Extract issue number from branch name (e.g., feature/123-add-auth -> 123)
+    BRANCH_NAME=$(git symbolic-ref --short HEAD 2>/dev/null)
+    ISSUE_NUMBER=$(echo "$BRANCH_NAME" | grep -oE '[0-9]+' | head -1)
+    
+    if [ -n "$ISSUE_NUMBER" ]; then
+        # Get the current commit message
+        COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+        
+        # Check if issue number is already in the message
+        if ! echo "$COMMIT_MSG" | grep -qE "^#$ISSUE_NUMBER"; then
+            # Prepend issue number to commit message
+            echo "#$ISSUE_NUMBER $COMMIT_MSG" > "$COMMIT_MSG_FILE"
+        fi
+    fi
+fi

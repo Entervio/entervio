@@ -1,20 +1,18 @@
-from typing import Any, Dict
+import logging
+from typing import Any
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
-from app.db.database import get_db
-
-import logging
 
 from app.core.config import settings
-
+from app.db.database import get_db
 
 reusable_oauth2 = HTTPBearer(auto_error=True)
 logger = logging.getLogger(__name__)
 
 
-def decode_supabase_token(token: str) -> Dict[str, Any]:
+def decode_supabase_token(token: str) -> dict[str, Any]:
     """Decode and validate a Supabase JWT using the configured secret.
 
     Supabase issues JWTs signed with the project's JWT secret. We expect the
@@ -43,7 +41,7 @@ def decode_supabase_token(token: str) -> Dict[str, Any]:
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(reusable_oauth2),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """FastAPI dependency that extracts and validates the Supabase access token.
 
     Returns the decoded JWT claims. You can later adapt this to map to a local
@@ -55,16 +53,14 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication scheme",
         )
-    
 
     token = credentials.credentials
     claims = decode_supabase_token(token)
     return claims
 
 
-
 def get_current_db_user(
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(get_current_user),
     db: Any = Depends(get_db),
 ) -> Any:
     """
@@ -83,23 +79,23 @@ def get_current_db_user(
         )
 
     user = db.query(User).filter(User.supabase_id == supabase_id).first()
-    
+
     if not user:
         # Lazy creation
         logger.info(f"User {supabase_id} not found in local DB. Creating...")
-        
+
         # Extract metadata if available, otherwise use defaults
         user_metadata = current_user.get("user_metadata", {})
         email = current_user.get("email")
-        
+
         if not email:
-             # Should not happen with valid JWTs usually
-             raise HTTPException(status_code=400, detail="Email missing in token")
+            # Should not happen with valid JWTs usually
+            raise HTTPException(status_code=400, detail="Email missing in token")
 
         new_user = User(
             supabase_id=supabase_id,
             email=email,
-            name=user_metadata.get("name", email.split("@")[0]), # Fallback name
+            name=user_metadata.get("name", email.split("@")[0]),  # Fallback name
             phone=user_metadata.get("phone"),
         )
         db.add(new_user)

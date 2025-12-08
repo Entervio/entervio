@@ -1,14 +1,12 @@
-from typing import Optional
-
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
-import httpx
 
+from app.core.auth import get_current_db_user
 from app.core.config import settings
 from app.db.database import get_db
 from app.models.user import User
-from app.core.auth import get_current_db_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -17,7 +15,7 @@ class SignupRequest(BaseModel):
     name: str = Field(..., min_length=1)
     email: EmailStr
     password: str = Field(..., min_length=6)
-    phone: Optional[str] = None
+    phone: str | None = None
 
 
 class SignupResponse(BaseModel):
@@ -26,7 +24,9 @@ class SignupResponse(BaseModel):
     name: str
 
 
-@router.post("/signup", response_model=SignupResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/signup", response_model=SignupResponse, status_code=status.HTTP_201_CREATED
+)
 async def signup(payload: SignupRequest, db: Session = Depends(get_db)):
     # Create user in Supabase Auth using the service role key
     if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_ROLE_KEY:
@@ -113,5 +113,5 @@ async def get_me(user: User = Depends(get_current_db_user)):
         id=user.id,
         email=user.email,
         name=user.name,
-        has_resume=bool(user.raw_resume_text)
+        has_resume=bool(user.raw_resume_text),
     )

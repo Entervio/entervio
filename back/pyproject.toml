@@ -3,7 +3,7 @@ name = "back"
 version = "0.1.0"
 description = "Entervio Backend"
 readme = "README.md"
-requires-python = ">=3.10" 
+requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.31.0",
@@ -34,3 +34,31 @@ dependencies = [
     "typst>=0.14.0",
     "fastmcp",
 ]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.5.0",
+    "ruff>=0.14.8",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"  # adjust to your Python version
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

@@ -1,15 +1,16 @@
 from pydantic import BaseModel
-from typing import List
+
 
 class AnalysisRequest(BaseModel):
     job_description: str
 
+
 class AnalysisResponse(BaseModel):
     match_score: float
     total_keywords: int
-    found_keywords: List[str]
-    missing_keywords: List[str]
+    found_keywords: list[str]
+    missing_keywords: list[str]
     ats_score: int
-    ats_issues: List[str]
-    ats_recommendations: List[str]
-    strategic_critique: List[str]
+    ats_issues: list[str]
+    ats_recommendations: list[str]
+    strategic_critique: list[str]

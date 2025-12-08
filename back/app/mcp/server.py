@@ -1,25 +1,25 @@
+import json
+
 from fastmcp import FastMCP
-from typing import Optional, List, Dict
-import asyncio
+
 from app.services.francetravail_service import francetravail_service
 from app.services.location_service import location_service
-import threading
-import json
 
 # Initialize FastMCP server
 mcp = FastMCP("JobSearch")
 
+
 @mcp.tool()
 async def search_jobs(
-    query: str, 
-    location: Optional[str] = None,
-    contract_type: Optional[str] = None,
-    is_full_time: Optional[bool] = None,
-    sort_by: Optional[str] = None
+    query: str,
+    location: str | None = None,
+    contract_type: str | None = None,
+    is_full_time: bool | None = None,
+    sort_by: str | None = None,
 ) -> str:
     """
     Search for jobs in France using the France Travail API with advanced filters.
-    
+
     Args:
         query: Job title, keywords or domain.
         location: City name or code.
@@ -35,19 +35,19 @@ async def search_jobs(
             cities = await location_service.search_cities(location)
             if cities:
                 location_code = cities[0].get("code")
-        
+
         jobs = await francetravail_service.search_jobs(
-            keywords=query, 
+            keywords=query,
             location=location_code,
             contract_type=contract_type,
             is_full_time=is_full_time,
-            sort_by=sort_by
+            sort_by=sort_by,
         )
 
         if not jobs:
             return "[]"
-            
+
         return json.dumps(jobs[:20], default=str)
     except Exception as e:
-        print(f"Error searching for jobs: {str(e)}") # Log effectively
-        return "[]" # Return empty JSON list to avoid parse error
+        print(f"Error searching for jobs: {str(e)}")  # Log effectively
+        return "[]"  # Return empty JSON list to avoid parse error

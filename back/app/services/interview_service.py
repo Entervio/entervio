@@ -1,24 +1,23 @@
 """Interview Service - Business logic for managing interviews"""
-from typing import Dict, Optional, List
-import logging
+
 import asyncio
+import logging
+
 from sqlalchemy.orm import Session
-from sqlalchemy import select
 
 from app.models.interview import Interview, InterviewerStyle
-from app.models.user import User
 from app.models.question_answer import QuestionAnswer
+from app.models.user import User
+from app.services.grading_service import grading_service
 from app.services.llm_service import llm_service
 from app.services.voice_service import voice_service
-from app.services.grading_service import grading_service
-from app.services.resume_service import resume_service_instance
 
 logger = logging.getLogger(__name__)
 
 
 class InterviewService:
     """Service for managing interview sessions and interactions."""
-    
+
     def __init__(self):
         """Initialize the interview service."""
         logger.info("🔄 Initializing InterviewService...")
@@ -26,108 +25,106 @@ class InterviewService:
         self.voice_service = voice_service
         self.grading_service = grading_service
         logger.info("✅ InterviewService initialized!")
-    
+
     async def start_interview(
-        self, 
+        self,
         db: Session,
         interviewer_style: InterviewerStyle,
         user: User,
-        job_description: Optional[str] = None
-    ) -> Dict:
+        job_description: str | None = None,
+    ) -> dict:
         """
         Start a new interview session.
-        
+
         Args:
             db: Database session
             candidate_name: Name of the interviewee
             interviewer_style: Style of interviewer (nice, neutral, mean)
-            
+
         Returns:
             Dict with interview_id, greeting text, and interview details
         """
         try:
             logger.info(f"Starting interview: {user.name} | {interviewer_style}")
-            
+
             # Create interview in database
             db_interview = Interview(
                 interviewer_style=interviewer_style,
                 user_id=user.id,
-                job_description=job_description
+                job_description=job_description,
             )
             db.add(db_interview)
             db.flush()  # Get the ID without committing yet
-            
+
             # Get candidate context if available
             candidate_context = ""
             # Reconstruct context from relational data if possible, or use raw text as fallback
             if user:
-                 if user.raw_resume_text:
-                     candidate_context = user.raw_resume_text
-                 elif user.work_experiences or user.projects:
-                     # Fallback: construct simple context string from DB models
-                     # Or use a service method to gather 'resume_data' dict like in tailor_resume
-                     # For now, let's use the helper we used in verify/tailor?
-                     # resume_service_instance.get_core_context expects a dict.
-                     # We can fetch the data into a dict and pass it.
-                     pass
-            
+                if user.raw_resume_text:
+                    candidate_context = user.raw_resume_text
+                elif user.work_experiences or user.projects:
+                    # Fallback: construct simple context string from DB models
+                    # Or use a service method to gather 'resume_data' dict like in tailor_resume
+                    # For now, let's use the helper we used in verify/tailor?
+                    # resume_service_instance.get_core_context expects a dict.
+                    # We can fetch the data into a dict and pass it.
+                    pass
+
             if candidate_context == "" and (user.work_experiences or user.projects):
-                 # Quick reconstruction if raw text missing
-                 candidate_context = f"User has {len(user.work_experiences)} jobs and {len(user.projects)} projects."
+                # Quick reconstruction if raw text missing
+                candidate_context = f"User has {len(user.work_experiences)} jobs and {len(user.projects)} projects."
 
             if candidate_context != "":
-                 logger.info(f"📄 Added resume context for candidate {user.id}")
+                logger.info(f"📄 Added resume context for candidate {user.id}")
 
             # Get personalized greeting from LLM
             greeting_text = self.llm_service.get_initial_greeting(
                 candidate_name=user.name,
                 interviewer_type=interviewer_style,
                 candidate_context=candidate_context,
-                job_description=job_description
+                job_description=job_description,
             )
-            
+
             # Create initial greeting as first question (Q = LLM output, A = user response)
             greeting_qa = QuestionAnswer(
                 question=greeting_text,  # LLM's greeting/question
                 answer=None,  # User's response will be added in next interaction
-                interview_id=db_interview.id
+                interview_id=db_interview.id,
             )
             db.add(greeting_qa)
             db.commit()
             db.refresh(db_interview)
-            
+
             logger.info(f"Generated {interviewer_style} greeting for {user.name}")
-            
+
             return {
-                "session_id": str(db_interview.id),  # Return as string for compatibility
+                "session_id": str(
+                    db_interview.id
+                ),  # Return as string for compatibility
                 "interview_id": db_interview.id,
                 "text": greeting_text,
                 "candidate_name": user.name,
                 "interviewer_style": interviewer_style,
-                "message": "Interview session started"
+                "message": "Interview session started",
             }
-            
+
         except Exception as e:
             db.rollback()
             logger.error(f"Error starting interview: {str(e)}")
             raise
-    
+
     async def process_response(
-        self,
-        db: Session,
-        interview_id: int,
-        audio_file_path: str,
-        language: str = "fr"
-    ) -> Dict:
+        self, db: Session, interview_id: int, audio_file_path: str, language: str = "fr"
+    ) -> dict:
         """
         Process candidate's audio response.
-        
+
         Args:
             db: Database session
             interview_id: Interview identifier
             audio_file_path: Path to audio file
             language: Language code
-            
+
         Returns:
             Dict with transcription and interviewer response
         """
@@ -136,107 +133,108 @@ class InterviewService:
             interview = db.query(Interview).filter(Interview.id == interview_id).first()
             if not interview:
                 raise ValueError(f"Interview {interview_id} not found")
-            
+
             logger.info(f"🎤 Processing audio for interview {interview_id}")
-            
+
             # Step 1: Transcribe audio using voice service
             logger.info("🔄 Transcribing audio...")
             transcribed_text = await self.voice_service.transcribe_audio(
-                audio_file_path,
-                language=language
+                audio_file_path, language=language
             )
             logger.info(f"✅ Transcription: {transcribed_text}")
 
-            
             # Step 2: Update the last question with the user's answer
             # Get the last question-answer pair (which should have answer=None)
-            last_qa = interview.question_answers[-1] if interview.question_answers else None
+            last_qa = (
+                interview.question_answers[-1] if interview.question_answers else None
+            )
             if last_qa and last_qa.answer is None:
                 last_qa.answer = transcribed_text
                 db.flush()  # Flush to get the ID if needed
             else:
                 # If no pending question, log a warning but continue
-                logger.warning(f"⚠️ No pending question found for interview {interview_id}")
+                logger.warning(
+                    f"⚠️ No pending question found for interview {interview_id}"
+                )
 
             # Step 3: Build conversation history from database
             conversation_history = self._build_conversation_history(interview)
-            
+
             candidate_context = ""
             if interview.user:
                 # Ensure we have the latest data
                 # The db object is passed as an argument, not self.db
-                db.refresh(interview.user) 
+                db.refresh(interview.user)
                 if interview.user.raw_resume_text:
-                    logger.info(f"Found candidate {interview.user.name} with resume text length: {len(interview.user.raw_resume_text)}")
+                    logger.info(
+                        f"Found candidate {interview.user.name} with resume text length: {len(interview.user.raw_resume_text)}"
+                    )
                     candidate_context = interview.user.raw_resume_text
                 else:
-                    logger.warning(f"Candidate {interview.user.name} has no resume text.")
+                    logger.warning(
+                        f"Candidate {interview.user.name} has no resume text."
+                    )
             else:
                 logger.warning("No candidate associated with this interview.")
 
-            logger.info(f"Passing candidate_context to LLM (Length: {len(candidate_context)})")
+            logger.info(
+                f"Passing candidate_context to LLM (Length: {len(candidate_context)})"
+            )
 
             # Step 4: Get LLM response with interviewer personality (next question)
-            logger.info(f"🔄 Getting {interview.interviewer_style} interviewer response...")
+            logger.info(
+                f"🔄 Getting {interview.interviewer_style} interviewer response..."
+            )
             llm_response = await self.llm_service.chat(
                 transcribed_text,
                 conversation_history,
                 interview.interviewer_style,
                 candidate_context=candidate_context,
-                job_description=interview.job_description
+                job_description=interview.job_description,
             )
-            logger.info(f"✅ LLM response: {llm_response[:100]}...")
-            
+            logger.info(f"LLM response: {llm_response[:100]}...")
+
             # Step 5: Create new question-answer record
             qa = QuestionAnswer(
                 question=llm_response,  # LLM's next question
                 answer=None,  # User's response will be added in next interaction
-                interview_id=interview.id
+                interview_id=interview.id,
             )
             interview.question_count = interview.question_count + 1
 
             db.add(qa)
             db.commit()
-            
-            # Step 6: Trigger background grading (non-blocking)
-            # This will run asynchronously and update the database when complete
+
             if last_qa and last_qa.answer:
-                asyncio.create_task(
-                    self.grading_service.grade_and_update(
-                        db=db,
-                        qa_id=last_qa.id,
-                        question=last_qa.question,
-                        answer=last_qa.answer,
-                        interviewer_style=interview.interviewer_style
-                    )
+                grading_service.grade_and_update_async(
+                    qa_id=last_qa.id,
+                    question=last_qa.question,
+                    answer=last_qa.answer,
+                    interviewer_style=interview.interviewer_style,
                 )
-                logger.info(f"🚀 Background grading task started for QA {last_qa.id}")
-            
+                logger.info(f"Background grading task started for QA {last_qa.id}")
+
             return {
                 "transcription": transcribed_text,
                 "response": llm_response,
                 "session_id": str(interview_id),
                 "question_count": interview.question_count,
-                "interviewer_style": interview.interviewer_style
+                "interviewer_style": interview.interviewer_style,
             }
-            
+
         except Exception as e:
             db.rollback()
-            logger.error(f"❌ Error processing response: {str(e)}")
+            logger.error(f"Error processing response: {str(e)}")
             raise
-    
-    async def end_interview(
-        self,
-        db: Session,
-        interview_id: int
-    ) -> Dict:
+
+    async def end_interview(self, db: Session, interview_id: int) -> dict:
         """
         End interview session and generate summary.
-        
+
         Args:
             db: Database session
             interview_id: Interview identifier
-            
+
         Returns:
             Dict with summary and interview details
         """
@@ -245,146 +243,149 @@ class InterviewService:
             interview = db.query(Interview).filter(Interview.id == interview_id).first()
             if not interview:
                 raise ValueError(f"Interview {interview_id} not found")
-            
+
             logger.info(f"👋 Ending interview {interview_id}")
-            
-            last_qa = interview.question_answers[-1] if interview.question_answers else None
+
+            last_qa = (
+                interview.question_answers[-1] if interview.question_answers else None
+            )
             if last_qa and last_qa.answer is None:
                 last_qa.answer = "[No response provided]"
-            
+
             conversation_history = self._build_conversation_history(interview)
-            
+
             summary = await self.llm_service.end_interview(
-                conversation_history,
-                interview.interviewer_style
+                conversation_history, interview.interviewer_style
             )
 
             # Serialize dictionary to JSON string for storage
             import json
+
             interview.global_feedback = json.dumps(summary)
 
             db.commit()
-            
+
             logger.info(f"✅ Interview ended: {interview_id}")
-            
-            
+
         except Exception as e:
             db.rollback()
             logger.error(f"❌ Error ending interview: {str(e)}")
             raise
 
     def get_interview_list(
-    self,
-    db: Session,
-    candidate_id: Optional[int] = None,
-    ) -> List[Dict]:
+        self,
+        db: Session,
+        candidate_id: int | None = None,
+    ) -> list[dict]:
         query = db.query(Interview).filter(Interview.deleted_at.is_(None))
-        
+
         if candidate_id is not None:
             query = query.filter(Interview.user_id == candidate_id)
-        
+
         interviews = query.all()
-        
+
         # Convert to dictionaries with calculated average grade
         result = []
         for interview in interviews:
             # Calculate average grade from question_answers
-            grades = [qa.grade for qa in interview.question_answers if qa.grade is not None]
+            grades = [
+                qa.grade for qa in interview.question_answers if qa.grade is not None
+            ]
             avg_grade = sum(grades) / len(grades) if grades else 0
-            
-            result.append({
-                "id": interview.id,
-                "created_at": interview.created_at,
-                "interviewer_style": interview.interviewer_style,
-                "question_count": len(interview.question_answers),
-                "grade": avg_grade,
-            })
-        
+
+            result.append(
+                {
+                    "id": interview.id,
+                    "created_at": interview.created_at,
+                    "interviewer_style": interview.interviewer_style,
+                    "question_count": len(interview.question_answers),
+                    "grade": avg_grade,
+                }
+            )
+
         return result
-    
-    def get_session_info(self, db: Session, interview_id: int) -> Optional[Dict]:
+
+    def get_session_info(self, db: Session, interview_id: int) -> dict | None:
         """
         Get session information.
-        
+
         Args:
             db: Database session
             interview_id: Interview identifier
-            
+
         Returns:
             Session info or None if not found
         """
         interview = db.query(Interview).filter(Interview.id == interview_id).first()
         if not interview:
             return None
-        
+
         # Calculate question count (exclude SUMMARY)
         question_count = sum(
-            1 for qa in interview.question_answers 
-            if qa.question != "[SUMMARY]"
+            1 for qa in interview.question_answers if qa.question != "[SUMMARY]"
         )
-        
-        return {
-            "session_id": str(interview_id),
-            "interview_id": interview_id,
-            "candidate_name": interview.user.name,
-            "interviewer_style": interview.interviewer_style,
-            "question_count": question_count
-        }
-    
-    def get_conversation_history(self, db: Session, interview_id: int) -> Optional[Dict]:
-        """
-        Get conversation history for a session.
-        
-        Args:
-            db: Database session
-            interview_id: Interview identifier
-            
-        Returns:
-            Conversation history or None if not found
-        """
-        interview = db.query(Interview).filter(Interview.id == interview_id).first()
-        if not interview:
-            return None
-        
-        # Build conversation history
-        conversation_history = self._build_conversation_history(interview)
-        
-        # Calculate question count (exclude SUMMARY)
-        question_count = sum(
-            1 for qa in interview.question_answers 
-            if qa.question != "[SUMMARY]"
-        )
-        
+
         return {
             "session_id": str(interview_id),
             "interview_id": interview_id,
             "candidate_name": interview.user.name,
             "interviewer_style": interview.interviewer_style,
             "question_count": question_count,
-            "history": conversation_history
         }
-    
-    def delete_session(self, db: Session, interview_id: int) -> bool:
+
+    def get_conversation_history(self, db: Session, interview_id: int) -> dict | None:
         """
-        Delete a session.
-        
+        Get conversation history for a session.
+
         Args:
             db: Database session
             interview_id: Interview identifier
-            
+
+        Returns:
+            Conversation history or None if not found
+        """
+        interview = db.query(Interview).filter(Interview.id == interview_id).first()
+        if not interview:
+            return None
+
+        # Build conversation history
+        conversation_history = self._build_conversation_history(interview)
+
+        # Calculate question count (exclude SUMMARY)
+        question_count = sum(
+            1 for qa in interview.question_answers if qa.question != "[SUMMARY]"
+        )
+
+        return {
+            "session_id": str(interview_id),
+            "interview_id": interview_id,
+            "candidate_name": interview.user.name,
+            "interviewer_style": interview.interviewer_style,
+            "question_count": question_count,
+            "history": conversation_history,
+        }
+
+    def delete_session(self, db: Session, interview_id: int) -> bool:
+        """
+        Delete a session.
+
+        Args:
+            db: Database session
+            interview_id: Interview identifier
+
         Returns:
             True if deleted, False if not found
         """
         interview = db.query(Interview).filter(Interview.id == interview_id).first()
         if not interview:
             return False
-        
+
         db.delete(interview)
         db.commit()
         logger.info(f"🗑️ Deleted interview: {interview_id}")
         return True
-    
-    def get_interview_summary(self, db: Session, interview_id: int) -> Optional[Dict]:
+
+    def get_interview_summary(self, db: Session, interview_id: int) -> dict | None:
         """
         Get the summary of the interview
         Args:
@@ -395,60 +396,53 @@ class InterviewService:
             its individual feedback
         """
         interview = db.query(Interview).filter(Interview.id == interview_id).first()
-        
+
         logger.info(f"🔍 Fetching summary for interview {interview_id}")
-        
+
         if not interview:
             return None
-        
+
         # Build the summary dictionary
-        summary = {
-            "feedback": interview.global_feedback,
-            "questions": []
-        }
-        
+        summary = {"feedback": interview.global_feedback, "questions": []}
+
         # Loop over question_answers and append each Q&A with feedback
         for qa in interview.question_answers:
-            summary["questions"].append({
-                "question": qa.question,
-                "answer": qa.answer,
-                "grade": qa.grade,
-                "feedback": qa.feedback
-            })
-        
+            summary["questions"].append(
+                {
+                    "question": qa.question,
+                    "answer": qa.answer,
+                    "grade": qa.grade,
+                    "feedback": qa.feedback,
+                }
+            )
+
         return summary
-    
+
     def _build_conversation_history(self, interview: Interview) -> list:
         """
         Build conversation history from interview question_answers.
         Now Q = LLM (assistant), A = User
-        
+
         Args:
             interview: Interview model instance
-            
+
         Returns:
             List of conversation messages
         """
         history = []
-        
+
         for qa in interview.question_answers:
-            history.append({
-                "role": "assistant",
-                "content": qa.question
-            })
+            history.append({"role": "assistant", "content": qa.question})
 
             if qa.answer:
-                history.append({
-                    "role": "user",
-                    "content": qa.answer
-                })
-        
+                history.append({"role": "user", "content": qa.answer})
+
         return history
-    
 
 
 # Singleton instance
 _interview_service_instance = None
+
 
 def get_interview_service() -> InterviewService:
     """Get or create the interview service singleton."""
@@ -458,6 +452,7 @@ def get_interview_service() -> InterviewService:
         _interview_service_instance = InterviewService()
         logger.info("✅ interview_service singleton created!")
     return _interview_service_instance
+
 
 # For convenience
 interview_service = get_interview_service()

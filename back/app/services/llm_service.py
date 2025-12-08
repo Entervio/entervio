@@ -1,14 +1,17 @@
 """LLM Service using Groq for Interview Scenarios"""
-import logging
-from typing import List, Dict, Literal, Any
-import numpy as np
-import asyncio
-from app.core.config import settings
-import json
-from groq import Groq
-import google.generativeai as genai
 
+import asyncio
+import json
+import logging
+from typing import Any, Literal
+
+import google.generativeai as genai
+import numpy as np
+from groq import Groq
+
+from app.core.config import settings
 from app.mcp.server import search_jobs
+
 # Setup logging
 logger = logging.getLogger(__name__)
 
@@ -55,7 +58,6 @@ EXEMPLE DE STYLE:
 ✅ BON: "Très bien, j'apprécie votre franchise. Maintenant, parlez-moi d'un projet technique..."
 
 IMPORTANT: Reste bienveillant mais CONCIS dans tes feedbacks.""",
-
     "neutral": """PERSONNALITÉ: Recruteur Professionnel et Objectif
 
 Tu es neutre, factuel et professionnel. Tu évalues objectivement sans être ni trop chaleureux ni froid.
@@ -73,7 +75,6 @@ EXEMPLE DE STYLE:
 ✅ BON: "D'accord. Parlez-moi d'une situation difficile que vous avez gérée."
 
 IMPORTANT: Reste neutre et CONCIS dans tes feedbacks.""",
-
     "mean": """PERSONNALITÉ: Recruteur Exigeant et Direct
 
 Tu es exigeant, critique et direct. Tu testes la résistance au stress du candidat.
@@ -90,13 +91,20 @@ EXEMPLE DE STYLE:
 ❌ MAUVAIS: "Votre réponse manque vraiment de substance et je dois dire que je m'attendais à beaucoup mieux de la part d'un candidat avec votre profil."
 ✅ BON: "Hmm, c'est vague. Donnez-moi un exemple concret avec des résultats chiffrés."
 
-IMPORTANT: Sois exigeant mais garde des feedbacks COURTS. Ne sois pas méchant, juste direct et exigeant."""
+IMPORTANT: Sois exigeant mais garde des feedbacks COURTS. Ne sois pas méchant, juste direct et exigeant.""",
 }
 
-def get_system_prompt(interviewer_type: InterviewerType, candidate_context: str = "", job_description: str = "") -> str:
+
+def get_system_prompt(
+    interviewer_type: InterviewerType,
+    candidate_context: str = "",
+    job_description: str = "",
+) -> str:
     """Get the complete system prompt for the given interviewer type."""
-    base_prompt = f"{BASE_INTERVIEW_INSTRUCTIONS}\n\n{INTERVIEWER_PROMPTS[interviewer_type]}"
-    
+    base_prompt = (
+        f"{BASE_INTERVIEW_INSTRUCTIONS}\n\n{INTERVIEWER_PROMPTS[interviewer_type]}"
+    )
+
     if job_description:
         base_prompt += f"\n\nDESCRIPTION DU POSTE:\n{job_description}\n\nINSTRUCTION: Tu dois mener cet entretien spécifiquement pour ce poste. Tes questions doivent évaluer l'adéquation du candidat avec cette description."
 
@@ -109,10 +117,10 @@ class LLMService:
     def __init__(self):
         """Initialize with Groq using settings from config."""
         logger.info("🔄 Initializing LLMService...")
-        
+
         # Get API keys
         groq_api_key = settings.GROQ_API_KEY
-        
+
         # Initialize Groq
         self.groq_client = None
         if groq_api_key:
@@ -129,7 +137,9 @@ class LLMService:
         if gemini_api_key:
             try:
                 genai.configure(api_key=gemini_api_key)
-                logger.info("✅ Google GenAI initialized successfully (for Embeddings).")
+                logger.info(
+                    "✅ Google GenAI initialized successfully (for Embeddings)."
+                )
                 self.has_gemini = True
             except Exception as e:
                 logger.error(f"❌ Failed to initialize Google GenAI: {e}")
@@ -137,136 +147,138 @@ class LLMService:
         else:
             logger.warning("⚠️ GEMINI_API_KEY not configured. Embeddings will not work.")
             self.has_gemini = False
-    
 
-    
     def get_initial_greeting(
-        self, 
-        candidate_name: str, 
+        self,
+        candidate_name: str,
         interviewer_type: InterviewerType,
         candidate_context: str = "",
-        job_description: str = ""
+        job_description: str = "",
     ) -> str:
         """
         Generate personalized initial greeting based on interviewer type.
-        
+
         Args:
             candidate_name: The candidate's name
             interviewer_type: Type of interviewer (nice, neutral, mean)
             candidate_context: Context from resume
             job_description: Job description context
-            
+
         Returns:
             Personalized greeting message
         """
-        logger.info(f"👋 Generating greeting for {candidate_name} with {interviewer_type} interviewer")
-        
+        logger.info(
+            f"👋 Generating greeting for {candidate_name} with {interviewer_type} interviewer"
+        )
+
         greetings = {
-            "nice": f"""Bonjour {candidate_name} ! Je suis absolument ravi de vous rencontrer aujourd'hui. 
+            "nice": f"""Bonjour {candidate_name} ! Je suis absolument ravi de vous rencontrer aujourd'hui.
 
 Je serai votre interlocuteur pour cet entretien et je veux que vous vous sentiez parfaitement à l'aise. Mon objectif est de découvrir qui vous êtes vraiment, vos talents et vos aspirations.
 
 N'hésitez surtout pas à être vous-même - il n'y a pas de mauvaises réponses ici ! Je suis simplement curieux d'en apprendre plus sur vous.
 
 Pour commencer, pourriez-vous vous présenter en quelques mots ? Parlez-moi de votre parcours.""",
-
-            "neutral": f"""Bonjour {candidate_name}. 
+            "neutral": f"""Bonjour {candidate_name}.
 
 Je serai votre interlocuteur aujourd'hui. L'objectif de cet entretien est d'évaluer votre profil, vos compétences et votre adéquation avec le poste.
 
 Nous allons passer en revue votre expérience et vos motivations. Soyez précis dans vos réponses.
 
 Commençons. Présentez-vous brièvement.""",
-
             "mean": f"""Bonjour {candidate_name}.
 
 Je n'ai pas beaucoup de temps, alors allons droit au but. J'ai vu beaucoup de candidats cette semaine et franchement, peu m'ont impressionné.
 
 J'attends des réponses concrètes, avec des exemples précis et des résultats mesurables. Pas de langue de bois.
 
-Présentez-vous. Et soyez synthétique."""
+Présentez-vous. Et soyez synthétique.""",
         }
-        
+
         return greetings[interviewer_type]
-    
+
     async def chat(
-        self, 
-        message: str, 
-        conversation_history: List[Dict[str, str]],
+        self,
+        message: str,
+        conversation_history: list[dict[str, str]],
         interviewer_type: InterviewerType,
         candidate_context: str = "",
-        job_description: str = ""
+        job_description: str = "",
     ) -> str:
         """
         Send message to Groq and get interviewer response.
         """
-        logger.info(f"💬 Processing candidate response with {interviewer_type} interviewer")
-        
+        logger.info(
+            f"💬 Processing candidate response with {interviewer_type} interviewer"
+        )
+
         if not self.groq_client:
             raise ValueError("Groq client not initialized")
 
         try:
             # 1. Build System Prompt
-            system_prompt = get_system_prompt(interviewer_type, candidate_context, job_description)
-            
+            system_prompt = get_system_prompt(
+                interviewer_type, candidate_context, job_description
+            )
+
             # 2. Build Messages
             messages = [{"role": "system", "content": system_prompt}]
-            
+
             # Add history
             for msg in conversation_history:
                 # Groq/OpenAI format is 'assistant' for model
                 role = "assistant" if msg["role"] == "assistant" else msg["role"]
                 # Map 'model' back to 'assistant' if it came from Gemini history
-                if role == "model": role = "assistant"
+                if role == "model":
+                    role = "assistant"
                 messages.append({"role": role, "content": msg["content"]})
-                
+
             # Add current message (if not already in history? usually caller appends it, but let's check)
             # The signature says 'message' is passed separately.
             messages.append({"role": "user", "content": message})
-            
+
             # 3. Call API
             completion = self.groq_client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=messages,
                 temperature=0.7,
-                max_tokens=1024
+                max_tokens=1024,
             )
-            
+
             response_text = completion.choices[0].message.content
-            
-            logger.info(f"✅ Got {interviewer_type} interviewer response ({len(response_text)} chars)")
+
+            logger.info(
+                f"✅ Got {interviewer_type} interviewer response ({len(response_text)} chars)"
+            )
             return response_text
-            
+
         except Exception as e:
             logger.error(f"❌ Chat error: {str(e)}")
             raise
-    
+
     async def grade_response(
-        self,
-        question: str,
-        answer: str,
-        interviewer_type: InterviewerType
-    ) -> Dict[str, any]:
+        self, question: str, answer: str, interviewer_type: InterviewerType
+    ) -> dict[str, any]:
         """
         Grade a candidate's response to an interview question.
         """
         logger.info(f"📊 Grading response with {interviewer_type} interviewer...")
-        
+
         if not self.groq_client:
             return {"grade": 5, "feedback": "Service non disponible"}
 
         try:
             system_prompt = get_system_prompt(interviewer_type)
-            
+
             grading_prompt = f"""Tu dois évaluer la réponse d'un candidat.
-            
+
             QUESTION: {question}
             RÉPONSE: {answer}
-            
+
             Consignes:
             - Note de 1 à 10.
             - Feedback court (2-3 phrases).
-            
+
             Format JSON de réponse:
             {{
                 "grade": 8,
@@ -277,30 +289,36 @@ Présentez-vous. Et soyez synthétique."""
             completion = self.groq_client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[
-                    {"role": "system", "content": system_prompt + "\n\nTu es un evaluateur qui répond en JSON."},
-                    {"role": "user", "content": grading_prompt}
+                    {
+                        "role": "system",
+                        "content": system_prompt
+                        + "\n\nTu es un evaluateur qui répond en JSON.",
+                    },
+                    {"role": "user", "content": grading_prompt},
                 ],
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"},
             )
-            
+
             result = json.loads(completion.choices[0].message.content)
             logger.info(f"✅ Response graded: {result.get('grade')}/10")
             return result
-            
+
         except Exception as e:
             logger.error(f"❌ Grading error: {str(e)}")
             return {"grade": 5, "feedback": "Erreur lors de l'évaluation."}
 
     async def end_interview(
-        self, 
-        conversation_history: List[Dict[str, str]],
-        interviewer_type: InterviewerType
-    ) -> Dict[str, Any]:
+        self,
+        conversation_history: list[dict[str, str]],
+        interviewer_type: InterviewerType,
+    ) -> dict[str, Any]:
         """
         Generate structured feedback using Groq.
         """
-        logger.info(f"📝 Generating structured interview feedback with {interviewer_type} interviewer...")
-        
+        logger.info(
+            f"📝 Generating structured interview feedback with {interviewer_type} interviewer..."
+        )
+
         if not self.groq_client:
             raise ValueError("Groq client not initialized")
 
@@ -310,14 +328,15 @@ Présentez-vous. Et soyez synthétique."""
             for msg in conversation_history:
                 role = "assistant" if msg["role"] == "assistant" else msg["role"]
                 # fix gemini usage
-                if role == "model": role = "assistant"
+                if role == "model":
+                    role = "assistant"
                 messages.append({"role": role, "content": msg["content"]})
-            
+
             prompt = f"""ANALYSIS REQUEST:
             The interview is finished. Based on the conversation history above, provide a structured evaluation.
-            
+
             Personality: {interviewer_type}
-            
+
             Output JSON:
             {{
                 "score": 0-10,
@@ -327,19 +346,19 @@ Présentez-vous. Et soyez synthétique."""
                 "overall_comment": "string"
             }}
             """
-            
+
             messages.append({"role": "user", "content": prompt})
 
             completion = self.groq_client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=messages,
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"},
             )
-            
+
             feedback_data = json.loads(completion.choices[0].message.content)
             logger.info("✅ Structured interview feedback generated")
             return feedback_data
-            
+
         except Exception as e:
             logger.error(f"❌ Error generating feedback: {str(e)}")
             return {
@@ -347,19 +366,17 @@ Présentez-vous. Et soyez synthétique."""
                 "strengths": ["Participation"],
                 "weaknesses": ["Erreur generation"],
                 "tips": [],
-                "overall_comment": "Erreur technique."
+                "overall_comment": "Erreur technique.",
             }
 
     async def compute_similarity_ranking(
-        self,
-        candidate_profile: str,
-        jobs: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+        self, candidate_profile: str, jobs: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         """
         Rerank jobs using Google Embeddings (text-embedding-004) with Batching + Async safety.
         """
         logger.info(f"⚖️ Reranking {len(jobs)} jobs using Google Embeddings...")
-        
+
         # 1. Fast fail checks
         if not jobs or not self.has_gemini:
             return jobs
@@ -368,10 +385,10 @@ Présentez-vous. Et soyez synthétique."""
         try:
             # Truncate profile to fit model limits (approx 2048 tokens ~ 8000 chars)
             profile_text = candidate_profile[:8000]
-            
+
             job_texts = []
             valid_jobs = []
-            
+
             # Pre-filter jobs to avoid empty text errors
             for job in jobs:
                 title = job.get("intitule", "")
@@ -379,17 +396,19 @@ Présentez-vous. Et soyez synthétique."""
                 # Skip jobs with literally no info
                 if not title and len(desc) < 10:
                     continue
-                    
+
                 text = f"Title: {title}\nDescription: {desc}"
                 job_texts.append(text)
                 valid_jobs.append(job)
 
             if not job_texts:
                 return jobs
-                
+
             # Cap at 100 to respect batch limits for now (simple safety)
             if len(job_texts) > 100:
-                logger.warning(f"⚠️ Capping reranking at 100 jobs (received {len(job_texts)})")
+                logger.warning(
+                    f"⚠️ Capping reranking at 100 jobs (received {len(job_texts)})"
+                )
                 job_texts = job_texts[:100]
                 valid_jobs = valid_jobs[:100]
 
@@ -400,19 +419,19 @@ Présentez-vous. Et soyez synthétique."""
                 profile_resp = genai.embed_content(
                     model="models/text-embedding-004",
                     content=profile_text,
-                    task_type="retrieval_query"
+                    task_type="retrieval_query",
                 )
-                p_vec = np.array(profile_resp['embedding'])
+                p_vec = np.array(profile_resp["embedding"])
 
                 # B. Embed Jobs (Batch)
                 jobs_resp = genai.embed_content(
                     model="models/text-embedding-004",
                     content=job_texts,
-                    task_type="retrieval_document"
+                    task_type="retrieval_document",
                 )
-                
+
                 # The response structure for batch input usually contains a list of embeddings
-                j_vecs = np.array(jobs_resp['embedding'])
+                j_vecs = np.array(jobs_resp["embedding"])
                 return p_vec, j_vecs
 
             # 4. Run blocking network calls in a thread pool
@@ -426,24 +445,24 @@ Présentez-vous. Et soyez synthétique."""
             # Normalize vectors
             norm_profile = np.linalg.norm(profile_vector)
             norm_jobs = np.linalg.norm(job_vectors, axis=1)
-            
+
             # Avoid division by zero
             # Create a mask for valid norms
             valid_norms = (norm_profile > 0) & (norm_jobs > 0)
-            
+
             # Dot product of Profile (1, D) and Jobs (N, D) -> (N,)
             # We can use pure numpy broadcasting here for speed
             scores = np.zeros(len(valid_jobs))
-            
+
             if norm_profile > 0:
                 dot_products = np.dot(job_vectors, profile_vector)
                 # Cosine Sim = Dot / (NormA * NormB)
                 # Handle safe division
                 similarities = np.divide(
-                    dot_products, 
-                    norm_profile * norm_jobs, 
-                    out=np.zeros_like(dot_products), 
-                    where=valid_norms
+                    dot_products,
+                    norm_profile * norm_jobs,
+                    out=np.zeros_like(dot_products),
+                    where=valid_norms,
                 )
                 scores = similarities * 100
 
@@ -452,7 +471,7 @@ Présentez-vous. Et soyez synthétique."""
             for i, job in enumerate(valid_jobs):
                 final_score = int(scores[i])
                 job["relevance_score"] = final_score
-                
+
                 # Dynamic reasoning based on score bucket
                 if final_score >= 85:
                     reasoning = "Excellent match stratégique (IA)"
@@ -462,14 +481,16 @@ Présentez-vous. Et soyez synthétique."""
                     reasoning = "Correspondance potentielle (IA)"
                 else:
                     reasoning = "Pertinence limitée"
-                
+
                 job["relevance_reasoning"] = reasoning
                 reranked_jobs.append(job)
 
             # 7. Sort
             reranked_jobs.sort(key=lambda x: x["relevance_score"], reverse=True)
-            
-            logger.info(f"✅ Jobs reranked via Google Embeddings (Top: {reranked_jobs[0]['relevance_score'] if reranked_jobs else 0})")
+
+            logger.info(
+                f"✅ Jobs reranked via Google Embeddings (Top: {reranked_jobs[0]['relevance_score'] if reranked_jobs else 0})"
+            )
             return reranked_jobs
 
         except Exception as e:
@@ -477,18 +498,18 @@ Présentez-vous. Et soyez synthétique."""
             # Fallback: Return original list order if AI fails
             return jobs
 
-
-    
-    async def search_with_tools(self, user_query: str, user_context: str, tools: List[Any]) -> List[Dict]:
+    async def search_with_tools(
+        self, user_query: str, user_context: str, tools: list[Any]
+    ) -> list[dict]:
         """
         Perform a search using Groq tool calling (OpenAI compatible).
         """
         logger.info(f"🛠️ Starting search with tools (Groq) for query: '{user_query}'")
-        
+
         try:
             if not self.groq_client:
                 raise ValueError("Groq client not initialized")
- 
+
             # OpenAI/Groq Tool Definition
             tools_schema = [
                 {
@@ -500,44 +521,40 @@ Présentez-vous. Et soyez synthétique."""
                             "type": "object",
                             "properties": {
                                 "query": {
-                                    "type": "string", 
-                                    "description": "Job title, keywords, or domain (e.g. 'Développeur Python')"
+                                    "type": "string",
+                                    "description": "Job title, keywords, or domain (e.g. 'Développeur Python')",
                                 },
                                 "location": {
                                     "type": "string",
-                                    "description": "City name or zip code (e.g. 'Paris', '69002'). Omit this parameter if no location is specified."
+                                    "description": "City name or zip code (e.g. 'Paris', '69002'). Omit this parameter if no location is specified.",
                                 },
                                 "contract_type": {
                                     "type": "string",
                                     "enum": ["CDI", "CDD", "MIS", "ALE", "DDI", "DIN"],
-                                    "description": "Type of contract. Omit if not specified."
+                                    "description": "Type of contract. Omit if not specified.",
                                 },
                                 "is_full_time": {
                                     "type": "boolean",
-                                    "description": "Set to true if user specifically asks for full-time work. Omit otherwise."
+                                    "description": "Set to true if user specifically asks for full-time work. Omit otherwise.",
                                 },
                                 "sort_by": {
                                     "type": "string",
                                     "enum": ["date", "relevance"],
-                                    "description": "Sort order. Omit if not specified."
-                                }
+                                    "description": "Sort order. Omit if not specified.",
+                                },
                             },
-                            "required": ["query"]
-                        }
-                    }
+                            "required": ["query"],
+                        },
+                    },
                 }
             ]
 
             messages = [
                 {
                     "role": "system",
-                    "content": f"You are a Job Search Agent. \nContext: {user_context}\n\nTask: Search for relevant jobs using the 'search_jobs' tool.\n\nSTRATEGY: To ensure results, you MUST call the 'search_jobs' tool many TIMES in parallel with different keyword variations:\n1. Exact fit (e.g. 'Développeur Python')\n2. Broader term (e.g. 'Développeur Back-end')\n3. Alternative/English term (e.g. 'Python API')\n\nCRITICAL: DO NOT INVENT A LOCATION. If the user doesn't specify one, OMIT the location parameter entirely.\n\nYou can also infer contract type (CDI/CDD) or full-time preference if explicitly stated."
-
+                    "content": f"You are a Job Search Agent. \nContext: {user_context}\n\nTask: Search for relevant jobs using the 'search_jobs' tool.\n\nSTRATEGY: To ensure results, you MUST call the 'search_jobs' tool many TIMES in parallel with different keyword variations:\n1. Exact fit (e.g. 'Développeur Python')\n2. Broader term (e.g. 'Développeur Back-end')\n3. Alternative/English term (e.g. 'Python API')\n\nCRITICAL: DO NOT INVENT A LOCATION. If the user doesn't specify one, OMIT the location parameter entirely.\n\nYou can also infer contract type (CDI/CDD) or full-time preference if explicitly stated.",
                 },
-                {
-                    "role": "user",
-                    "content": user_query
-                }
+                {"role": "user", "content": user_query},
             ]
 
             response = self.groq_client.chat.completions.create(
@@ -545,24 +562,24 @@ Présentez-vous. Et soyez synthétique."""
                 messages=messages,
                 tools=tools_schema,
                 tool_choice="auto",
-                max_tokens=4096 
+                max_tokens=4096,
             )
 
             response_message = response.choices[0].message
             tool_calls = response_message.tool_calls
-            
+
             all_found_jobs = []
 
             if tool_calls:
                 logger.info(f"🤖 Groq decided to call {len(tool_calls)} tools")
-                
+
                 # Execute tool calls
                 for tool_call in tool_calls:
                     function_name = tool_call.function.name
                     if function_name == "search_jobs":
                         function_args = json.loads(tool_call.function.arguments)
                         logger.info(f"📞 Calling search_jobs with: {function_args}")
-                        
+
                         # Call the tool function (it's underlying function is async)
                         # We pass keywords and location. search_jobs is a FastMCP tool, so use .fn
                         query = function_args.get("query")
@@ -570,33 +587,37 @@ Présentez-vous. Et soyez synthétique."""
                         contract_type = function_args.get("contract_type")
                         is_full_time = function_args.get("is_full_time")
                         sort_by = function_args.get("sort_by")
-                        
+
                         # Call the imported function
                         # search_jobs returns a JSON string
                         jobs_json = await search_jobs.fn(
-                            query=query, 
+                            query=query,
                             location=location,
                             contract_type=contract_type,
                             is_full_time=is_full_time,
-                            sort_by=sort_by
+                            sort_by=sort_by,
                         )
-                        
+
                         try:
                             jobs = json.loads(jobs_json)
                             if isinstance(jobs, list):
                                 all_found_jobs.extend(jobs)
                         except Exception as e:
-                            logger.error(f"❌ Failed to parse jobs JSON from tool: {e}. Content: {jobs_json[:200]}...")
+                            logger.error(
+                                f"❌ Failed to parse jobs JSON from tool: {e}. Content: {jobs_json[:200]}..."
+                            )
 
             logger.info(f"✅ Extracted {len(all_found_jobs)} jobs from tool execution")
             return all_found_jobs
-            
+
         except Exception as e:
             logger.error(f"❌ Error in search_with_tools (Groq): {str(e)}")
             return []
 
+
 # Singleton instance - initialized on first import
 _llm_service_instance = None
+
 
 def get_llm_service() -> LLMService:
     """Get or create the LLM service singleton."""
@@ -606,6 +627,7 @@ def get_llm_service() -> LLMService:
         _llm_service_instance = LLMService()
         logger.info("✅ llm_service singleton created!")
     return _llm_service_instance
+
 
 # For convenience
 llm_service = get_llm_service()
