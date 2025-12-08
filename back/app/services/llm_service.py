@@ -524,7 +524,8 @@ Présentez-vous. Et soyez synthétique."""
             messages = [
                 {
                     "role": "system",
-                    "content": f"You are a Job Search Agent. \nContext: {user_context}\n\nTask: Search for relevant jobs. Use the 'search_jobs' tool. Analyze the user's query and profile to pick the best keywords (in French) and location.\n\nCRITICAL: DO NOT INVENT A LOCATION. If the user doesn't specify one, OMIT the location parameter entirely.\n\nYou can also infer contract type (CDI/CDD) or full-time preference if explicitly stated."
+                    "content": f"You are a Job Search Agent. \nContext: {user_context}\n\nTask: Search for relevant jobs using the 'search_jobs' tool.\n\nSTRATEGY: To ensure results, you MUST call the 'search_jobs' tool 3 TIMES in parallel with different keyword variations:\n1. Exact fit (e.g. 'Développeur Python')\n2. Broader term (e.g. 'Développeur Back-end')\n3. Alternative/English term (e.g. 'Python API')\n\nCRITICAL: DO NOT INVENT A LOCATION. If the user doesn't specify one, OMIT the location parameter entirely.\n\nYou can also infer contract type (CDI/CDD) or full-time preference if explicitly stated."
+
                 },
                 {
                     "role": "user",
