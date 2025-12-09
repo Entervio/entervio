@@ -51,6 +51,7 @@ class SearchJobsArgs(BaseModel):
         ]
         | None
     ) = None
+    published_since: int | None = None
 
     @field_validator("query")
     @classmethod
@@ -628,6 +629,10 @@ Présentez-vous. Et soyez synthétique.""",
                                     ],
                                     "description": "Domain code to filter by sector. Key codes: M18=IT/Tech, D=Sales, H=Industry, J=Health, K=Services, F=Construction, N=Transport, M14=Consulting. Use to narrow results.",
                                 },
+                                "published_since": {
+                                    "type": "integer",
+                                    "description": "Filter jobs published within the last X days. Use this when the user asks for 'recent' jobs or jobs from the last few days.",
+                                },
                             },
                             "required": ["query"],
                         },
@@ -677,8 +682,8 @@ Présentez-vous. Et soyez synthétique.""",
                     * **LOCATION/CONTRACT:** Omit location or contract_type unless **EXPLICITLY** requested by the user.
                     * **VAGUE QUERY HANDLING:** If the user's typed query is vague (e.g., "cherche job"), use the **[INFERRED_TITLE]** for all three calls.
                     * **OUTPUT:** Generate the JSON structure for 3 distinct calls to 'search_jobs'.
-                    """
-},
+                    """,
+                },
                 {"role": "user", "content": user_query},
             ]
 
@@ -733,6 +738,7 @@ Présentez-vous. Et soyez synthétique.""",
                             experience=validated_args.experience,
                             experience_exigence=validated_args.experience_exigence,
                             grand_domaine=validated_args.grand_domaine,
+                            published_since=validated_args.published_since,
                         )
 
                         try:

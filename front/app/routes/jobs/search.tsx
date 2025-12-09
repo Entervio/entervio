@@ -578,10 +578,11 @@ export default function JobsSearch() {
     };
 
     const quickChips = [
-        "100% Télétravail",
-        "Salaire > 60k",
-        "Startups",
-        "Python"
+        "CDI Temps Plein",
+        "Junior",
+        "Tech & IT",
+        "Commercial",
+        "Nouveaux Jobs",
     ];
 
     return (

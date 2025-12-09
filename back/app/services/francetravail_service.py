@@ -71,6 +71,10 @@ class FranceTravailService:
         if kwargs.get("grand_domaine"):
             params["grandDomaine"] = kwargs["grand_domaine"]
 
+        # Published since (in days)
+        if kwargs.get("published_since"):
+            params["publieeDepuis"] = kwargs["published_since"]
+
         if location:
             # If location is a zip code or INSEE code (5 digits), use it directly
             # Otherwise, we assume it's a code passed from SmartJobService
