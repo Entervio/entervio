@@ -563,6 +563,7 @@ Présentez-vous. Et soyez synthétique.""",
                 tools=tools_schema,
                 tool_choice="auto",
                 max_tokens=4096,
+                temperature=0,
             )
 
             response_message = response.choices[0].message
@@ -580,8 +581,6 @@ Présentez-vous. Et soyez synthétique.""",
                         function_args = json.loads(tool_call.function.arguments)
                         logger.info(f"📞 Calling search_jobs with: {function_args}")
 
-                        # Call the tool function (it's underlying function is async)
-                        # We pass keywords and location. search_jobs is a FastMCP tool, so use .fn
                         query = function_args.get("query")
                         location = function_args.get("location")
                         contract_type = function_args.get("contract_type")
