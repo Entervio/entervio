@@ -297,9 +297,7 @@ class ResumeParserService:
             tailored_data = json.loads(completion.choices[0].message.content)
             logger.info("✅ Tailored resume data generated successfully with Groq")
         except Exception as e:
-            logger.error(f"Error tailoring resume: {e}")
-            # Fallback to original if tailoring fails
-            tailored_data = resume_data
+            raise e
 
         # 3. Compile PDF
         logger.info("📝 Compiling PDF with Typst...")
