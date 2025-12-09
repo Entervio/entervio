@@ -50,8 +50,8 @@ class FranceTravailService:
         if kwargs.get("contract_type"):
             params["typeContrat"] = kwargs["contract_type"]  # e.g. "CDI", "CDD"
 
-        if kwargs.get("is_full_time") is not None:
-            params["tempsPlein"] = "true" if kwargs["is_full_time"] else "false"
+        if kwargs.get("is_full_time"):
+            params["tempsPlein"] = kwargs["is_full_time"]
 
         if kwargs.get("sort_by") == "date":
             params["sort"] = 1

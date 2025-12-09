@@ -1,4 +1,5 @@
 import json
+import unicodedata
 
 from fastmcp import FastMCP
 
@@ -7,6 +8,15 @@ from app.services.location_service import location_service
 
 # Initialize FastMCP server
 mcp = FastMCP("JobSearch")
+
+
+def sanitize_query(text: str) -> str:
+    """Remove accents and sanitize a query string."""
+    # Normalize to NFD (decomposed form), filter out diacritical marks
+    normalized = unicodedata.normalize("NFD", text)
+    without_accents = "".join(c for c in normalized if unicodedata.category(c) != "Mn")
+    # Strip whitespace and return
+    return without_accents.strip()
 
 
 @mcp.tool()
@@ -37,7 +47,7 @@ async def search_jobs(
                 location_code = cities[0].get("code")
 
         jobs = await francetravail_service.search_jobs(
-            keywords=query,
+            keywords=sanitize_query(query),
             location=location_code,
             contract_type=contract_type,
             is_full_time=is_full_time,
