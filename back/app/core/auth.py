@@ -1,12 +1,13 @@
 import logging
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
 from app.core.config import settings
-from app.db.database import get_db
+from app.core.deps import DbSession
+from app.models.user import User
 
 reusable_oauth2 = HTTPBearer(auto_error=True)
 logger = logging.getLogger(__name__)
@@ -36,11 +37,11 @@ def decode_supabase_token(token: str) -> dict[str, Any]:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate Supabase credentials",
-        )
+        ) from e
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(reusable_oauth2),
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(reusable_oauth2)],
 ) -> dict[str, Any]:
     """FastAPI dependency that extracts and validates the Supabase access token.
 
@@ -60,16 +61,14 @@ async def get_current_user(
 
 
 def get_current_db_user(
-    current_user: dict[str, Any] = Depends(get_current_user),
-    db: Any = Depends(get_db),
+    current_user: Annotated[dict[str, Any], Depends(get_current_user)],
+    db: DbSession,
 ) -> Any:
     """
     Dependency that returns the local DB user.
     If the user exists in Supabase (valid token) but not in local DB,
     it creates the local user record automatically.
     """
-    # Avoid circular imports
-    from app.models.user import User
 
     supabase_id = current_user.get("sub")
     if not supabase_id:
@@ -104,3 +103,6 @@ def get_current_db_user(
         return new_user
 
     return user
+
+
+CurrentUser = Annotated[User, Depends(get_current_db_user)]

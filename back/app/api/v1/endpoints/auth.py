@@ -1,11 +1,12 @@
-import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy.orm import Session
+"""Auth REST API Endpoints"""
 
-from app.core.auth import get_current_db_user
+import httpx
+from fastapi import APIRouter, HTTPException, status
+from pydantic import BaseModel, EmailStr, Field
+
+from app.core.auth import CurrentUser
 from app.core.config import settings
-from app.db.database import get_db
+from app.core.deps import DbSession
 from app.models.user import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -27,7 +28,8 @@ class SignupResponse(BaseModel):
 @router.post(
     "/signup", response_model=SignupResponse, status_code=status.HTTP_201_CREATED
 )
-async def signup(payload: SignupRequest, db: Session = Depends(get_db)):
+async def signup(payload: SignupRequest, db: DbSession):
+    """Create a new user account."""
     # Create user in Supabase Auth using the service role key
     if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_ROLE_KEY:
         raise HTTPException(
@@ -57,7 +59,7 @@ async def signup(payload: SignupRequest, db: Session = Depends(get_db)):
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=f"Failed to communicate with Supabase: {e}",
-            )
+            ) from e
 
     if resp.status_code not in (200, 201):
         try:
@@ -105,10 +107,8 @@ class UserProfileResponse(BaseModel):
 
 
 @router.get("/me", response_model=UserProfileResponse)
-async def get_me(user: User = Depends(get_current_db_user)):
-    """
-    Get current user profile.
-    """
+async def get_me(user: CurrentUser):
+    """Get current user profile."""
     return UserProfileResponse(
         id=user.id,
         email=user.email,

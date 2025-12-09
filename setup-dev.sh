@@ -7,8 +7,8 @@ if ! command -v uv &> /dev/null; then
     exit 1
 fi
 
-# Install pre-commit
-uv run pre-commit install
+# Install pre-commit (from back/ where pre-commit is installed)
+cd back && uv run pre-commit install && cd ..
 
 # Make custom hooks executable
 chmod +x .githooks/prepare-commit-msg

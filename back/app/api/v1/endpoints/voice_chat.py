@@ -5,11 +5,10 @@ import os
 import tempfile
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
 
-from app.db import get_db
+from app.core.deps import DbSession
 from app.services.interview_service import interview_service
 from app.services.voice_service import voice_service
 
@@ -20,7 +19,7 @@ InterviewerType = Literal["nice", "neutral", "mean"]
 
 
 @router.get("/interview/{interview_id}/audio")
-async def get_audio(interview_id: int, text: str, db: Session = Depends(get_db)):
+async def get_audio(interview_id: int, text: str, db: DbSession):
     """Convert text to speech and return audio file."""
     try:
         # Verify interview exists
@@ -35,9 +34,7 @@ async def get_audio(interview_id: int, text: str, db: Session = Depends(get_db))
             temp_path = temp_file.name
 
             # Collect all audio chunks
-            async for audio_chunk in voice_service.text_to_speech_stream(
-                text,
-            ):
+            async for audio_chunk in voice_service.text_to_speech_stream(text):
                 temp_file.write(audio_chunk)
 
         # Create a generator to stream the file
@@ -49,7 +46,7 @@ async def get_audio(interview_id: int, text: str, db: Session = Depends(get_db))
             finally:
                 try:
                     os.unlink(temp_path)
-                except:
+                except OSError:
                     pass
 
         logger.info(f"✅ Audio generated for interview {interview_id}")
@@ -64,4 +61,4 @@ async def get_audio(interview_id: int, text: str, db: Session = Depends(get_db))
         raise
     except Exception as e:
         logger.error(f"❌ Error generating audio: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e

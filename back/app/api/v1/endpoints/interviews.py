@@ -3,13 +3,12 @@
 import logging
 import os
 import tempfile
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
-from app.core.auth import get_current_db_user
-from app.db import get_db
-from app.models.user import User
+from app.core.auth import CurrentUser
+from app.core.deps import DbSession
 from app.schemas import StartInterviewRequest
 from app.services.interview_service import interview_service
 
@@ -19,8 +18,8 @@ router = APIRouter()
 
 @router.get("/")
 async def get_interviews(
-    user: User = Depends(get_current_db_user),
-    db: Session = Depends(get_db),
+    user: CurrentUser,
+    db: DbSession,
 ) -> list[dict]:
     """
     Get list of interviews, optionally filtered by candidate_id.
@@ -39,8 +38,8 @@ async def get_interviews(
 @router.post("/start")
 async def start_interview(
     request: StartInterviewRequest,
-    user: User = Depends(get_current_db_user),
-    db: Session = Depends(get_db),
+    user: CurrentUser,
+    db: DbSession,
 ):
     """Start a new interview session."""
     try:
@@ -54,15 +53,15 @@ async def start_interview(
 
     except Exception as e:
         logger.error(f"Error starting interview: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/{interview_id}/respond")
 async def process_audio_response(
     interview_id: int,
-    audio: UploadFile = File(...),
-    language: str = Form("fr"),
-    db: Session = Depends(get_db),
+    audio: Annotated[UploadFile, File()],
+    db: DbSession,
+    language: Annotated[str, Form()] = "fr",
 ):
     """Process audio response from candidate."""
     try:
@@ -88,31 +87,31 @@ async def process_audio_response(
             # Clean up temp file
             try:
                 os.unlink(temp_audio_path)
-            except:
+            except OSError:
                 pass
 
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
         logger.error(f"❌ Error processing audio: {str(e)}")
         logger.exception("Full traceback:")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/{interview_id}/end")
-async def end_interview(interview_id: int, db: Session = Depends(get_db)):
+async def end_interview(interview_id: int, db: DbSession):
     """End interview session and get summary."""
     try:
         await interview_service.end_interview(db=db, interview_id=interview_id)
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
         logger.error(f"❌ Error ending interview: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/{interview_id}/history")
-async def get_conversation_history(interview_id: int, db: Session = Depends(get_db)):
+async def get_conversation_history(interview_id: int, db: DbSession):
     """Get conversation history for a session."""
     try:
         history = interview_service.get_conversation_history(db, interview_id)
@@ -124,11 +123,11 @@ async def get_conversation_history(interview_id: int, db: Session = Depends(get_
         raise
     except Exception as e:
         logger.error(f"❌ Error getting history: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/{interview_id}/info")
-async def get_session_info(interview_id: int, db: Session = Depends(get_db)):
+async def get_session_info(interview_id: int, db: DbSession):
     """Get session information without full history."""
     try:
         info = interview_service.get_session_info(db, interview_id)
@@ -140,20 +139,17 @@ async def get_session_info(interview_id: int, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         logger.error(f"❌ Error getting session info: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/{interview_id}/summary")
-async def get_interview_summary(interview_id: int, db: Session = Depends(get_db)):
+async def get_interview_summary(interview_id: int, db: DbSession):
     """Get interview summary."""
-    try:
-        return interview_service.get_interview_summary(db, interview_id)
-    except:
-        raise
+    return interview_service.get_interview_summary(db, interview_id)
 
 
 @router.delete("/{interview_id}")
-async def delete_session(interview_id: int, db: Session = Depends(get_db)):
+async def delete_session(interview_id: int, db: DbSession):
     """Delete a session without ending interview."""
     try:
         deleted = interview_service.delete_session(db, interview_id)
@@ -166,4 +162,4 @@ async def delete_session(interview_id: int, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         logger.error(f"❌ Error deleting session: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
