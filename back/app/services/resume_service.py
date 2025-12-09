@@ -10,6 +10,7 @@ import typst
 from fastapi import HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
+from app.core.prompt_manager import prompt_manager
 from app.models.resume_models import Education, Language, Project, Skill, WorkExperience
 from app.models.user import User
 from app.services.llm_service import llm_service
@@ -50,66 +51,11 @@ class ResumeParserService:
         if not llm_service.groq_client:
             raise ValueError("Groq client not initialized")
 
-        prompt = f"""
-        You are a strict Resume Parsing API.
-        Extract data from the resume text below and return ONLY a valid JSON object.
-        Do not add Markdown formatting (```json) or explanations.
+        prompt = prompt_manager.format_prompt(
+            "resume.extraction", resume_text=raw_text[:25000]
+        )
 
-        Structure required:
-        {{
-        "contact_info": {{
-            "name": "string",
-            "email": "string",
-            "phone": "string",
-            "linkedin": "string (nullable)",
-            "website": "string (nullable)"
-        }},
-        "summary": "string (2-3 sentences)",
-        "work_experience": [
-            {{
-            "company": "string",
-            "role": "string",
-            "location": "string (nullable)",
-            "start_date": "string (YYYY-MM)",
-            "end_date": "string (YYYY-MM or 'Present')",
-            "description": "string (full text with bullet points as newlines or markdown)"
-            }}
-        ],
-        "education": [
-            {{
-            "institution": "string",
-            "degree": "string",
-            "field_of_study": "string (nullable)",
-            "start_date": "string (nullable)",
-            "end_date": "string (nullable)",
-            "graduation_date": "string (nullable)"
-            }}
-        ],
-        "projects": [
-            {{
-            "name": "string",
-            "role": "string",
-            "start_date": "string",
-            "end_date": "string",
-            "tech_stack": "string",
-            "details": "string (description)"
-            }}
-        ],
-        "languages": [
-            {{
-            "name": "string",
-            "proficiency": "string"
-            }}
-        ],
-        "skills": {{
-            "technical": ["string"],
-            "soft": ["string"]
-        }}
-        }}
-
-        RESUME TEXT:
-        {raw_text[:25000]}
-        """
+        system_content = prompt_manager.get("resume.extraction_system")
 
         try:
             completion = llm_service.groq_client.chat.completions.create(
@@ -117,7 +63,7 @@ class ResumeParserService:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a resume parser that outputs JSON.",
+                        "content": system_content,
                     },
                     {"role": "user", "content": prompt},
                 ],
@@ -234,7 +180,8 @@ class ResumeParserService:
                 for e in user.educations
             ],
             "languages": [
-                {"name": language.name, "level": language.proficiency} for language in user.languages
+                {"name": language.name, "level": language.proficiency}
+                for language in user.languages
             ],
             "skills": {
                 "technical": [
@@ -248,24 +195,13 @@ class ResumeParserService:
         if not llm_service.groq_client:
             raise ValueError("Groq client not initialized")
 
-        prompt = f"""
-        Role: Expert Resume Writer.
-        Task: Tailor the following resume JSON for this Job Description.
+        prompt = prompt_manager.format_prompt(
+            "resume.tailoring",
+            job_description=job_description,
+            resume_json=json.dumps(resume_data),
+        )
 
-        Goal:
-        - Rewrite the 'summary' to highlight relevant experience.
-        - Rewrite 'responsibilities' in 'work_experience' to emphasize JD keywords.
-        - Select relevant 'projects' and highlight their relevance.
-        - KEEP data factual (do not invent jobs).
-        - RETURN the FULL JSON structure tailored.
-        - Do not add fake experience.
-        - the resume must be in the same language as the job description.
-        JOB DESCRIPTION:
-        {job_description}
-
-        RESUME JSON:
-        {json.dumps(resume_data)}
-        """
+        system_content = prompt_manager.get("resume.tailoring_system")
 
         try:
             completion = llm_service.groq_client.chat.completions.create(
@@ -273,7 +209,7 @@ class ResumeParserService:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are an expert resume writer that outputs JSON.",
+                        "content": system_content,
                     },
                     {"role": "user", "content": prompt},
                 ],

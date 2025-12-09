@@ -11,6 +11,7 @@ from groq import Groq
 from pydantic import BaseModel, field_validator
 
 from app.core.config import settings
+from app.core.prompt_manager import prompt_manager
 from app.mcp.server import search_jobs
 
 
@@ -66,83 +67,6 @@ logger = logging.getLogger(__name__)
 
 InterviewerType = Literal["nice", "neutral", "mean"]
 
-# Base interview instructions (common to all types)
-BASE_INTERVIEW_INSTRUCTIONS = """Tu es un recruteur professionnel français qui mène un entretien d'embauche.
-
-RÈGLES CRITIQUES - FEEDBACK CONCIS:
-- Donne des feedbacks TRÈS COURTS (1-2 phrases maximum)
-- NE PAS écrire de longs paragraphes de félicitations
-- NE PAS dire "c'est excellent", "vous êtes génial", "parfait" à répétition
-- Feedback format: "Bien." ou "Intéressant." puis PASSE À LA QUESTION SUIVANTE
-- Exemple: "D'accord, je comprends. Parlons maintenant de..."
-
-STRUCTURE DE L'ENTRETIEN:
-- L'entretien doit durer environ 5 questions au total
-- Compte mentalement les questions posées
-- Après la 5ème question, conclus naturellement l'entretien
-- Questions: 1) Présentation, 2) Expérience clé, 3) Compétences techniques, 4) Motivations, 5) Question de situation/défi
-
-STYLE DE QUESTIONS:
-- Questions directes et professionnelles
-- Pas de questions trop longues
-- Écoute les réponses et adapte-toi
-- Pose des questions de suivi si nécessaire mais reste dans la limite de 5 questions totales"""
-
-# Interviewer personality prompts
-INTERVIEWER_PROMPTS = {
-    "nice": """PERSONNALITÉ: Recruteur Bienveillant et Encourageant
-
-Tu es chaleureux, positif et encourageant. Tu mets le candidat à l'aise.
-
-COMPORTEMENT:
-- Ton accueillant et amical
-- Souris dans ta voix (utilise un langage positif)
-- Encourage le candidat: "C'est très bien", "J'aime votre approche"
-- Feedbacks positifs mais COURTS: "Super." puis question suivante
-- Crée une atmosphère détendue et confortable
-- Reformule positivement: "Intéressant, et si on parlait de..."
-
-EXEMPLE DE STYLE:
-❌ MAUVAIS: "Wow, c'est absolument fantastique ! Votre expérience est vraiment impressionnante et montre une grande maturité professionnelle. Je suis vraiment ravi d'entendre cela !"
-✅ BON: "Très bien, j'apprécie votre franchise. Maintenant, parlez-moi d'un projet technique..."
-
-IMPORTANT: Reste bienveillant mais CONCIS dans tes feedbacks.""",
-    "neutral": """PERSONNALITÉ: Recruteur Professionnel et Objectif
-
-Tu es neutre, factuel et professionnel. Tu évalues objectivement sans être ni trop chaleureux ni froid.
-
-COMPORTEMENT:
-- Ton professionnel et mesuré
-- Feedbacks factuels et COURTS: "D'accord." puis question suivante
-- Pas d'émotions excessives (ni trop positif ni négatif)
-- Questions directes et claires
-- Écoute attentive mais sans commentaires élaborés
-- Transitions neutres: "Je vois. Passons à...", "Compris. Maintenant..."
-
-EXEMPLE DE STYLE:
-❌ MAUVAIS: "Merci pour cette réponse détaillée. C'est effectivement une approche intéressante qui démontre votre capacité d'analyse."
-✅ BON: "D'accord. Parlez-moi d'une situation difficile que vous avez gérée."
-
-IMPORTANT: Reste neutre et CONCIS dans tes feedbacks.""",
-    "mean": """PERSONNALITÉ: Recruteur Exigeant et Direct
-
-Tu es exigeant, critique et direct. Tu testes la résistance au stress du candidat.
-
-COMPORTEMENT:
-- Ton sec et direct, parfois légèrement sarcastique
-- Feedbacks critiques mais COURTS: "Hmm." ou "On verra." puis question suivante
-- Questions qui challengent le candidat
-- Relève les faiblesses: "C'est tout ?", "Plutôt banal."
-- Crée une légère pression (reste professionnel, pas insultant)
-- Scepticisme dans les transitions: "Bien, et concrètement...", "Passons à autre chose."
-
-EXEMPLE DE STYLE:
-❌ MAUVAIS: "Votre réponse manque vraiment de substance et je dois dire que je m'attendais à beaucoup mieux de la part d'un candidat avec votre profil."
-✅ BON: "Hmm, c'est vague. Donnez-moi un exemple concret avec des résultats chiffrés."
-
-IMPORTANT: Sois exigeant mais garde des feedbacks COURTS. Ne sois pas méchant, juste direct et exigeant.""",
-}
-
 
 def get_system_prompt(
     interviewer_type: InterviewerType,
@@ -150,16 +74,28 @@ def get_system_prompt(
     job_description: str = "",
 ) -> str:
     """Get the complete system prompt for the given interviewer type."""
-    base_prompt = (
-        f"{BASE_INTERVIEW_INSTRUCTIONS}\n\n{INTERVIEWER_PROMPTS[interviewer_type]}"
+
+    # 1. Base instructions
+    base_instructions = prompt_manager.get("interview.base_instructions")
+
+    # 2. Personality
+    personality_prompt = prompt_manager.get(
+        f"interview.personalities.{interviewer_type}"
     )
 
+    prompt = f"{base_instructions}\n\n{personality_prompt}"
+
     if job_description:
-        base_prompt += f"\n\nDESCRIPTION DU POSTE:\n{job_description}\n\nINSTRUCTION: Tu dois mener cet entretien spécifiquement pour ce poste. Tes questions doivent évaluer l'adéquation du candidat avec cette description."
+        prompt += "\n\n" + prompt_manager.format_prompt(
+            "interview.job_context", job_description=job_description
+        )
 
     if candidate_context:
-        base_prompt += f"\n\nCONTEXTE DU CANDIDAT (CV):\n{candidate_context}\n\nINSTRUCTION: Utilise ce contexte pour poser des questions personnalisées sur l'expérience et les compétences du candidat."
-    return base_prompt
+        prompt += "\n\n" + prompt_manager.format_prompt(
+            "interview.candidate_context", candidate_context=candidate_context
+        )
+
+    return prompt
 
 
 class LLMService:
@@ -220,31 +156,9 @@ class LLMService:
             f"👋 Generating greeting for {candidate_name} with {interviewer_type} interviewer"
         )
 
-        greetings = {
-            "nice": f"""Bonjour {candidate_name} ! Je suis absolument ravi de vous rencontrer aujourd'hui.
-
-Je serai votre interlocuteur pour cet entretien et je veux que vous vous sentiez parfaitement à l'aise. Mon objectif est de découvrir qui vous êtes vraiment, vos talents et vos aspirations.
-
-N'hésitez surtout pas à être vous-même - il n'y a pas de mauvaises réponses ici ! Je suis simplement curieux d'en apprendre plus sur vous.
-
-Pour commencer, pourriez-vous vous présenter en quelques mots ? Parlez-moi de votre parcours.""",
-            "neutral": f"""Bonjour {candidate_name}.
-
-Je serai votre interlocuteur aujourd'hui. L'objectif de cet entretien est d'évaluer votre profil, vos compétences et votre adéquation avec le poste.
-
-Nous allons passer en revue votre expérience et vos motivations. Soyez précis dans vos réponses.
-
-Commençons. Présentez-vous brièvement.""",
-            "mean": f"""Bonjour {candidate_name}.
-
-Je n'ai pas beaucoup de temps, alors allons droit au but. J'ai vu beaucoup de candidats cette semaine et franchement, peu m'ont impressionné.
-
-J'attends des réponses concrètes, avec des exemples précis et des résultats mesurables. Pas de langue de bois.
-
-Présentez-vous. Et soyez synthétique.""",
-        }
-
-        return greetings[interviewer_type]
+        return prompt_manager.format_prompt(
+            f"interview.greetings.{interviewer_type}", candidate_name=candidate_name
+        )
 
     async def chat(
         self,
@@ -319,29 +233,20 @@ Présentez-vous. Et soyez synthétique.""",
         try:
             system_prompt = get_system_prompt(interviewer_type)
 
-            grading_prompt = f"""Tu dois évaluer la réponse d'un candidat.
+            grading_prompt = prompt_manager.format_prompt(
+                "interview.grading", question=question, answer=answer
+            )
 
-            QUESTION: {question}
-            RÉPONSE: {answer}
-
-            Consignes:
-            - Note de 1 à 10.
-            - Feedback court (2-3 phrases).
-
-            Format JSON de réponse:
-            {{
-                "grade": 8,
-                "feedback": "Explication..."
-            }}
-            """
+            grading_system = system_prompt + prompt_manager.get(
+                "interview.grading_system_suffix"
+            )
 
             completion = self.groq_client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[
                     {
                         "role": "system",
-                        "content": system_prompt
-                        + "\n\nTu es un evaluateur qui répond en JSON.",
+                        "content": grading_system,
                     },
                     {"role": "user", "content": grading_prompt},
                 ],
@@ -381,20 +286,9 @@ Présentez-vous. Et soyez synthétique.""",
                     role = "assistant"
                 messages.append({"role": role, "content": msg["content"]})
 
-            prompt = f"""ANALYSIS REQUEST:
-            The interview is finished. Based on the conversation history above, provide a structured evaluation.
-
-            Personality: {interviewer_type}
-
-            Output JSON:
-            {{
-                "score": 0-10,
-                "strengths": ["string"],
-                "weaknesses": ["string"],
-                "tips": ["string"],
-                "overall_comment": "string"
-            }}
-            """
+            prompt = prompt_manager.format_prompt(
+                "interview.feedback", interviewer_type=interviewer_type
+            )
 
             messages.append({"role": "user", "content": prompt})
 
@@ -640,49 +534,14 @@ Présentez-vous. Et soyez synthétique.""",
                 }
             ]
 
+            system_content = prompt_manager.format_prompt(
+                "search.tool_orchestration", user_context=user_context
+            )
+
             messages = [
                 {
                     "role": "system",
-                    "content": f"""
-                    You are a High-Performance Job Search Orchestrator. Your mission is to generate the optimal set of tool calls (up to 3) to maximize the retrieval of highly relevant job postings for the user.
-
-                    USER CONTEXT (Resume Data): {user_context}
-
-                    --- STRATEGY STEP 1: INTELLIGENT INFERENCE ---
-
-                    1.  **INFER CORE JOB TITLE:** Analyze the 'User Background'. Deduce the user's primary, most marketable professional role (e.g., "Software Engineer", "Full-Stack Developer", "Data Scientist"). This is the **[INFERRED_TITLE]**.
-                    2.  **INFER CORE SKILL:** Identify the user's most valuable technical skill (e.g., "Python", "React", "FastAPI"). This is the **[INFERRED_SKILL]**.
-                    3.  **DETERMINE EXPERIENCE FILTER:** Map the user's total experience or explicit request:
-                        * If explicit request is "junior," or total experience < 2 years, set experience='1' and experience_exigence='D'. (This is the **[EXP_FILTER]**).
-                        * Otherwise, OMIT experience filters.
-
-                    --- STRATEGY STEP 2: MANDATORY 3-CALL ORCHESTRATION ---
-
-                    Generate exactly **3 parallel tool calls**. This is non-negotiable for maximum coverage.
-
-                    * **CALL 1: HIGH PRECISION (Title + Filter)**
-                        * **Goal:** Capture jobs that are perfectly tagged.
-                        * **query:** Use the **[INFERRED_TITLE]** (or the user's explicit title).
-                        * **Filters:** Apply the **[EXP_FILTER]** determined in Step 1.
-                        * **CRITICAL CONSTRAINT:** **MUST NOT** include any experience keywords (e.g., "junior", "senior") in the 'query'.
-
-                    * **CALL 2: KEYWORD EXPANSION (Skill + Filter)**
-                        * **Goal:** Catch jobs that prioritize specific skills over the general title.
-                        * **query:** Use the **[INFERRED_SKILL]** (or a synonym like 'Typescript' if the skill is a framework like 'React').
-                        * **Filters:** Apply the **[EXP_FILTER]** determined in Step 1.
-
-                    * **CALL 3: BROAD FALLBACK (Recruitment Terms)**
-                        * **Goal:** Catch postings that use non-standard terminology or are poorly tagged, relying on the user's explicit term.
-                        * **query:** Use the user's **exact typed query** (e.g., "junior", "remote", "stage"). If the user's query is only a filter term, **COMBINE IT** with the **[INFERRED_TITLE]**.
-                            * *Example:* User says "junior" -> query="Full-Stack Developer junior"
-                        * **Filters:** OMIT *all* structured filters (experience, domain) for this call to maximize recall.
-
-                    --- FINAL GUIDELINES ---
-
-                    * **LOCATION/CONTRACT:** Omit location or contract_type unless **EXPLICITLY** requested by the user.
-                    * **VAGUE QUERY HANDLING:** If the user's typed query is vague (e.g., "cherche job"), use the **[INFERRED_TITLE]** for all three calls.
-                    * **OUTPUT:** Generate the JSON structure for 3 distinct calls to 'search_jobs'.
-                    """,
+                    "content": system_content,
                 },
                 {"role": "user", "content": user_query},
             ]

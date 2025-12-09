@@ -33,6 +33,7 @@ dependencies = [
     "numpy",
     "typst>=0.14.0",
     "fastmcp",
+    "pyyaml>=6.0.3",
 ]
 
 [dependency-groups]
