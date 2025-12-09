@@ -605,9 +605,10 @@ Présentez-vous. Et soyez synthétique.""",
                             logger.error(
                                 f"❌ Failed to parse jobs JSON from tool: {e}. Content: {jobs_json[:200]}..."
                             )
+            unique_jobs = list({job["id"]: job for job in all_found_jobs if job.get("id")}.values())
 
-            logger.info(f"✅ Extracted {len(all_found_jobs)} jobs from tool execution")
-            return all_found_jobs
+            logger.info(f"✅ Extracted {len(unique_jobs)} unique jobs from tool execution")
+            return unique_jobs
 
         except Exception as e:
             logger.error(f"❌ Error in search_with_tools (Groq): {str(e)}")
