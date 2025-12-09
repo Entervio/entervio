@@ -32,7 +32,7 @@ api_router.include_router(
     tags=["jobs"],
 )
 
-api_router.include_router(
+protected_router.include_router(
     resume.router,
     prefix="/resume",
     tags=["resume"],
