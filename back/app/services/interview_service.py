@@ -1,6 +1,5 @@
 """Interview Service - Business logic for managing interviews"""
 
-import asyncio
 import logging
 
 from sqlalchemy.orm import Session

@@ -27,10 +27,10 @@ def async_to_sync_with_timeout(timeout: int = 30):
                 return loop.run_until_complete(
                     asyncio.wait_for(func(*args, **kwargs), timeout=timeout)
                 )
-            except TimeoutError:
+            except TimeoutError as e:
                 raise TimeoutError(
                     f"Function {func.__name__} timed out after {timeout}s"
-                )
+                ) from e
             finally:
                 loop.close()
 
