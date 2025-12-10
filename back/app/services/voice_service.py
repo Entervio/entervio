@@ -1,5 +1,3 @@
-"""Voice Service using Groq API (STT) and ElevenLabs/Edge TTS (TTS)"""
-
 import io
 import logging
 from collections.abc import AsyncGenerator
