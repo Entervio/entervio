@@ -305,7 +305,7 @@ class ResumeParserService:
 
         # Prepare user context for LLM
         user_context = {
-            "name": user.name,
+            "name": user.first_name,
             "email": user.email,
             "phone": user.phone,
             "work_experience": [
@@ -344,7 +344,7 @@ class ResumeParserService:
         prompt = prompt_manager.format_prompt(
             "cover_letter.generation",
             job_description=job_description,
-            user_data=json.dumps(user_context, indent=2, ensure_ascii=False),
+            user_context=json.dumps(user_context, indent=2, ensure_ascii=False),
         )
 
         system = prompt_manager.format_prompt("cover_letter.system")
@@ -378,7 +378,7 @@ Je reste à votre disposition pour un entretien afin de vous présenter plus en 
                 "closing": "Cordialement,",
             }
 
-        user_details_parts = [user.name]
+        user_details_parts = [f"{user.first_name} {user.last_name}"]
         if user.phone:
             user_details_parts.append(user.phone)
         if user.email:

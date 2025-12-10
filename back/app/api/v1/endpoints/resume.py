@@ -4,7 +4,6 @@ from typing import Annotated
 from fastapi import APIRouter, File, HTTPException, Response, UploadFile
 
 from app.core.auth import CurrentUser
-from app.core.auth import CurrentUser
 from app.core.deps import DbSession
 from app.models.resume_models import (
     Education as EducationModel,
@@ -24,7 +23,12 @@ from app.models.resume_models import (
 from app.models.resume_models import (
     WorkExperience as WorkExperienceModel,
 )
-from app.schemas.resume import ResumeFull, ResumeUpdate, TailorRequest
+from app.schemas.resume import (
+    CoverLetterRequest,
+    ResumeFull,
+    ResumeUpdate,
+    TailorRequest,
+)
 from app.services.resume_service import resume_service_instance
 
 logger = logging.getLogger(__name__)
@@ -167,3 +171,24 @@ async def tailor_resume(
         raise HTTPException(
             status_code=500, detail=f"Internal server error: {str(e)}"
         ) from e
+
+
+@router.post("/cover-letter")
+async def get_cover_letter(
+    request: CoverLetterRequest,
+    db: DbSession,
+    user: CurrentUser,
+):
+    try:
+        pdf_bytes = await resume_service_instance.generate_cover_letter(
+            db=db,
+            user_id=user.id,
+            job_description=request.job_description,
+        )
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": "attachment; filename=tailored_resume.pdf"},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
