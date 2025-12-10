@@ -281,14 +281,30 @@ class InterviewService:
 
         interviews = query.all()
 
-        # Convert to dictionaries with calculated average grade
+        # Convert to dictionaries with calculated average grade or global score
         result = []
         for interview in interviews:
-            # Calculate average grade from question_answers
-            grades = [
-                qa.grade for qa in interview.question_answers if qa.grade is not None
-            ]
-            avg_grade = sum(grades) / len(grades) if grades else 0
+            final_grade = 0
+
+            # Try to get global score first
+            if interview.global_feedback:
+                try:
+                    summary_data = json.loads(interview.global_feedback)
+                    # Use .get() to avoid errors if score is missing
+                    if "score" in summary_data:
+                        final_grade = float(summary_data["score"])
+                except Exception:
+                    # If JSON parse fails or other error, fall back to average
+                    pass
+
+            # Fallback to average calculation if no valid global score found (and it is 0)
+            if final_grade == 0:
+                grades = [
+                    qa.grade
+                    for qa in interview.question_answers
+                    if qa.grade is not None
+                ]
+                final_grade = sum(grades) / len(grades) if grades else 0
 
             result.append(
                 {
@@ -296,7 +312,7 @@ class InterviewService:
                     "created_at": interview.created_at,
                     "interviewer_style": interview.interviewer_style,
                     "question_count": len(interview.question_answers),
-                    "grade": avg_grade,
+                    "grade": final_grade,
                 }
             )
 
