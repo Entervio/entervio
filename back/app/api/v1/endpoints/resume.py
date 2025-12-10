@@ -52,7 +52,11 @@ async def upload_resume(
 @router.get("/full", response_model=ResumeFull)
 async def get_full_resume(user: CurrentUser):
     """Get full structured resume."""
+    resume = user.resume
     return ResumeFull(
+        website=resume.website if resume else None,
+        linkedin=resume.linkedin if resume else None,
+        summary=resume.summary if resume else None,
         work_experiences=user.work_experiences,
         educations=user.educations,
         projects=user.projects,
