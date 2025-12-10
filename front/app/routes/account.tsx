@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
-import { User, Mail, Phone, FileText, Loader2 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
+import { User, Loader2, ChevronRight, Pencil, Briefcase } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Badge } from "~/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { Separator } from "~/components/ui/separator";
 
 import type { UserDetailed } from "~/types/user";
 
@@ -44,7 +45,6 @@ export default function Account() {
         setUser(data);
         setFormData({ first_name: data.first_name, last_name: data.last_name, phone: data.phone || "" });
       } else {
-        // Handle token expiry or invalid token
         if (res.status === 401) {
           navigate("/login");
         }
@@ -91,115 +91,154 @@ export default function Account() {
   }
 
   return (
-    <div className="container mx-auto px-6 py-12 max-w-4xl">
-      <div className="mb-10 text-center">
-        <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60 mb-2">
-          Mon Compte
-        </h1>
-        <p className="text-muted-foreground">Gérez vos informations personnelles</p>
-      </div>
-
-      <div className="grid gap-8 md:grid-cols-3">
-        {/* Profile Card */}
-        <Card className="md:col-span-1 h-fit">
-          <CardContent className="pt-6 text-center">
-            <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <User className="w-10 h-10 text-primary" />
-            </div>
-            <h3 className="font-semibold text-lg">{user?.first_name} {user?.last_name}</h3>
-            <p className="text-sm text-muted-foreground mb-4">{user?.email}</p>
-            {user?.has_resume && (
-              <Badge variant="secondary" className="mb-4">
-                CV Importé
-              </Badge>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Details & Edit */}
-        <div className="md:col-span-2 space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle>Informations Personnelles</CardTitle>
-                  <CardDescription>Vos coordonnées de contact</CardDescription>
+    <div className="min-h-screen bg-muted/20 pb-20">
+      <div className="container mx-auto px-4 py-12 max-w-3xl">
+         {/* Page Header */}
+        <div className="mb-8 space-y-2 text-center md:text-left">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground lg:text-4xl">
+            Mon Compte
+          </h1>
+          <p className="text-muted-foreground text-lg">
+            Gérez vos informations personnelles et votre dossier de candidature.
+          </p>
+        </div>
+        
+        <div className="grid gap-6">
+          
+          {/* Card A: Profile & Status */}
+          <Card className="border border-border/40 shadow-none bg-card/50 backdrop-blur-sm">
+            <CardContent className="p-6 flex flex-col md:flex-row items-center gap-6">
+              <div className="relative">
+                <div className="w-20 h-20 bg-gradient-to-br from-primary/5 to-secondary/5 rounded-full flex items-center justify-center border border-border/60">
+                    <span className="text-2xl font-bold text-primary/80">
+                        {user?.first_name?.[0]?.toUpperCase()}{user?.last_name?.[0]?.toUpperCase()}
+                    </span>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => setEditing(!editing)}>
-                  {editing ? "Annuler" : "Modifier"}
-                </Button>
+                {user?.has_resume && (
+                    <div className="absolute bottom-0 right-0 w-5 h-5 bg-emerald-500 rounded-full border-2 border-background"></div>
+                )}
               </div>
-            </CardHeader>
-            <CardContent>
-              {editing ? (
-                <form onSubmit={handleUpdate} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="first_name">Prénom</Label>
-                      <Input
-                        id="first_name"
-                        value={formData.first_name}
-                        onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="last_name">Nom</Label>
-                      <Input
-                        id="last_name"
-                        value={formData.last_name}
-                        onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                      />
-                    </div>
+              
+              <div className="text-center md:text-left flex-1 space-y-1">
+                  <div>
+                    <h2 className="text-2xl font-bold tracking-tight capitalize">{user?.first_name} {user?.last_name}</h2>
+                    <p className="text-muted-foreground font-medium text-sm">{user?.email}</p>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Téléphone</Label>
-                    <Input
-                      id="phone"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    />
-                  </div>
-                  <Button type="submit">Enregistrer</Button>
-                </form>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center p-3 border rounded-lg">
-                    <Mail className="w-5 h-5 text-muted-foreground mr-3" />
-                    <div>
-                      <p className="text-sm font-medium">Email</p>
-                      <p className="text-sm text-muted-foreground">{user?.email}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center p-3 border rounded-lg">
-                    <Phone className="w-5 h-5 text-muted-foreground mr-3" />
-                    <div>
-                      <p className="text-sm font-medium">Téléphone</p>
-                      <p className="text-sm text-muted-foreground">
-                        {user?.phone || "Non renseigné"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
+              </div>
+
+              <div className="mt-2 md:mt-0">
+                 {user?.has_resume ? (
+                    <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border-0 px-4 py-1.5 text-sm font-medium rounded-full shadow-none transition-colors">
+                      CV Importé
+                    </Badge>
+                  ) : (
+                     <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 px-4 py-1.5 text-sm font-medium rounded-full shadow-none">
+                      CV Incomplet
+                    </Badge>
+                  )}
+              </div>
             </CardContent>
           </Card>
 
-          <Link to="/account/resume" className="block">
-            <Card className="border-dashed border-2 hover:border-primary/50 transition-colors cursor-pointer group">
-              <CardContent className="flex items-center p-6">
-                <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
-                  <FileText className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">Gérer mon CV</h3>
-                  <p className="text-muted-foreground">Modifier mes expériences, formations et compétences</p>
-                </div>
-                <Button variant="ghost" size="icon">
-                  →
-                </Button>
+          {/* Card B: Account Information */}
+          <Card className="border border-border/40 shadow-none overflow-hidden bg-card/80">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 pt-6 px-6">
+                  <div className="space-y-1">
+                      <CardTitle className="text-lg font-bold">Informations du Compte</CardTitle>
+                      <CardDescription>Vos coordonnées de contact</CardDescription>
+                  </div>
+                  {!editing && (
+                      <Button size="sm" variant="ghost" className="rounded-full hover:bg-muted h-8 px-3 text-muted-foreground" onClick={() => setEditing(true)}>
+                          <Pencil className="h-3.5 w-3.5 mr-2" />
+                          Modifier
+                      </Button>
+                  )}
+              </CardHeader>
+              
+              <CardContent className="p-0">
+                  {editing ? (
+                      <form onSubmit={handleUpdate} className="p-6 space-y-5 bg-muted/10">
+                          <div className="grid md:grid-cols-2 gap-5">
+                              <div className="space-y-2">
+                                  <Label htmlFor="first_name" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Prénom</Label>
+                                  <Input
+                                      id="first_name"
+                                      value={formData.first_name}
+                                      onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                                      className="border border-border/50 bg-background shadow-none focus-visible:ring-emerald-500"
+                                  />
+                              </div>
+                              <div className="space-y-2">
+                                  <Label htmlFor="last_name" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Nom</Label>
+                                  <Input
+                                      id="last_name"
+                                      value={formData.last_name}
+                                      onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                                      className="border border-border/50 bg-background shadow-none focus-visible:ring-emerald-500"
+                                  />
+                              </div>
+                          </div>
+                          <div className="space-y-2">
+                              <Label htmlFor="phone" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Téléphone</Label>
+                              <Input
+                                  id="phone"
+                                  value={formData.phone}
+                                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                  className="border border-border/50 bg-background shadow-none focus-visible:ring-emerald-500"
+                              />
+                          </div>
+                          
+                          <div className="flex justify-end gap-3 pt-2">
+                              <Button variant="ghost" size="sm" type="button" onClick={() => setEditing(false)}>
+                                  Annuler
+                              </Button>
+                              <Button type="submit" size="sm" className="shadow-none bg-emerald-600 hover:bg-emerald-700 text-white">
+                                  Enregistrer
+                              </Button>
+                          </div>
+                      </form>
+                  ) : (
+                      <div className="divide-y divide-border/30">
+                          <div className="flex flex-col md:flex-row md:items-center py-4 px-6 hover:bg-muted/5 transition-colors group">
+                              <span className="text-sm text-muted-foreground/70 font-medium w-1/3">Nom complet</span>
+                              <span className="text-foreground font-medium text-base group-hover:text-emerald-700 transition-colors capitalize">{user?.first_name} {user?.last_name}</span>
+                          </div>
+                          <div className="flex flex-col md:flex-row md:items-center py-4 px-6 hover:bg-muted/5 transition-colors group">
+                              <span className="text-sm text-muted-foreground/70 font-medium w-1/3">Email</span>
+                              <span className="text-foreground font-medium group-hover:text-emerald-700 transition-colors">{user?.email}</span>
+                          </div>
+                          <div className="flex flex-col md:flex-row md:items-center py-4 px-6 hover:bg-muted/5 transition-colors group">
+                              <span className="text-sm text-muted-foreground/70 font-medium w-1/3">Téléphone</span>
+                              <span className="text-foreground font-medium group-hover:text-emerald-700 transition-colors">{user?.phone || "Non renseigné"}</span>
+                          </div>
+                      </div>
+                  )}
               </CardContent>
-            </Card>
-          </Link>
+          </Card>
+
+          {/* Card C: Resume Management */}
+          <Card className="border border-border/40 shadow-none overflow-hidden group bg-gradient-to-r from-card to-emerald-50/30 hover:to-emerald-50/50 transition-all duration-500">
+              <CardHeader className="relative z-10 pb-2">
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="p-2 bg-emerald-100/50 rounded-lg text-emerald-700">
+                        <Briefcase className="h-5 w-5" />
+                    </div>
+                    <CardTitle className="text-lg font-bold text-foreground">Gérer votre CV</CardTitle>
+                  </div>
+                  <CardDescription className="text-sm max-w-lg text-muted-foreground line-clamp-1">
+                      Mettez à jour vos expériences et compétences.
+                  </CardDescription>
+              </CardHeader>
+              <CardContent className="pb-6 relative z-10 pt-2">
+                  <Link to="/account/resume">
+                      <Button className="w-full md:w-auto h-9 text-sm px-4 shadow-none transition-all rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white border-0" size="sm">
+                          <span>Accéder à mon CV</span>
+                          <ChevronRight className="ml-2 h-4 w-4 opacity-80 group-hover:translate-x-1 transition-transform" />
+                      </Button>
+                  </Link>
+              </CardContent>
+          </Card>
+
         </div>
       </div>
     </div>
