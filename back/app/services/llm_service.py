@@ -13,6 +13,7 @@ from pydantic import BaseModel, field_validator
 from app.core.config import settings
 from app.core.prompt_manager import prompt_manager
 from app.mcp.server import search_jobs
+from app.models.interview import InterviewerStyle
 
 
 class SearchJobsArgs(BaseModel):
@@ -65,11 +66,8 @@ class SearchJobsArgs(BaseModel):
 # Setup logging
 logger = logging.getLogger(__name__)
 
-InterviewerType = Literal["nice", "neutral", "mean"]
-
-
 def get_system_prompt(
-    interviewer_type: InterviewerType,
+    interviewer_type: InterviewerStyle,
     candidate_context: str = "",
     job_description: str = "",
 ) -> str:
@@ -136,7 +134,7 @@ class LLMService:
     def get_initial_greeting(
         self,
         candidate_name: str,
-        interviewer_type: InterviewerType,
+        interviewer_type: InterviewerStyle,
         candidate_context: str = "",
         job_description: str = "",
     ) -> str:
@@ -164,7 +162,7 @@ class LLMService:
         self,
         message: str,
         conversation_history: list[dict[str, str]],
-        interviewer_type: InterviewerType,
+        interviewer_type: InterviewerStyle,
         candidate_context: str = "",
         job_description: str = "",
     ) -> str:
@@ -220,7 +218,7 @@ class LLMService:
             raise
 
     async def grade_response(
-        self, question: str, answer: str, interviewer_type: InterviewerType
+        self, question: str, answer: str, interviewer_type: InterviewerStyle
     ) -> dict[str, any]:
         """
         Grade a candidate's response to an interview question.
@@ -264,7 +262,7 @@ class LLMService:
     async def end_interview(
         self,
         conversation_history: list[dict[str, str]],
-        interviewer_type: InterviewerType,
+        interviewer_type: InterviewerStyle,
     ) -> dict[str, Any]:
         """
         Generate structured feedback using Groq.
