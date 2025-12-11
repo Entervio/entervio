@@ -52,17 +52,17 @@ class PromptManager:
         template = self.get(key_path)
         if not isinstance(template, str):
             logger.warning(
-                f"⚠️ Prompt key '{key_path}' is not a string. Returned raw value."
+                f"Prompt key '{key_path}' is not a string. Returned raw value."
             )
             return str(template) if template is not None else ""
 
         try:
             return template.format(**kwargs)
         except KeyError as e:
-            logger.error(f"❌ Missing key for prompt formatting '{key_path}': {e}")
+            logger.error(f"Missing key for prompt formatting '{key_path}': {e}")
             return template  # Return unformatted template as fallback
         except Exception as e:
-            logger.error(f"❌ Error formatting prompt '{key_path}': {e}")
+            logger.error(f"Error formatting prompt '{key_path}': {e}")
             return template
 
 

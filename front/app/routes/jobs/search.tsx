@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
-import { MapPin, Building2, Briefcase, ExternalLink, Sparkles, ChevronDown, ChevronUp, ArrowRight, Search, CheckCircle2, FileText, Loader2, Download } from "lucide-react";
+import { Building2, Briefcase, ExternalLink, Sparkles, ChevronDown, ChevronUp, ArrowRight, Search, CheckCircle2, FileText, Loader2, Download, Mail } from "lucide-react";
 import { jobsService, type JobOffer } from "~/services/jobs";
-import { Badge } from "~/components/ui/badge";
 import { cn } from "~/lib/utils";
 
 function useTypewriter(phrases: string[], typingSpeed = 50, deletingSpeed = 30, pauseDuration = 2000) {
@@ -107,7 +106,7 @@ function TailorResumeDialog({ jobDescription, jobTitle }: { jobDescription: stri
             setPdfUrl(null);
             setStep('idle');
         }
-    }, [isOpen]);
+    }, [isOpen, pdfUrl]);
 
     const handleGenerate = async () => {
         setStep('generating');
@@ -230,6 +229,151 @@ function TailorResumeDialog({ jobDescription, jobTitle }: { jobDescription: stri
     );
 }
 
+function GenerateCoverLetterDialog({ jobDescription, jobTitle }: { jobDescription: string, jobTitle: string }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [step, setStep] = useState<'idle' | 'generating' | 'preview'>('idle');
+    const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+    const [loadingMessage, setLoadingMessage] = useState("");
+
+    const messages = [
+        "Analyse de l'offre d'emploi...",
+        "Identification des points clés...",
+        "Extraction des informations de l'entreprise...",
+        "Rédaction de la lettre personnalisée...",
+        "Mise en forme professionnelle...",
+        "Génération du PDF..."
+    ];
+
+    // Cleanup blob URL when dialog closes
+    useEffect(() => {
+        if (!isOpen && pdfUrl) {
+            window.URL.revokeObjectURL(pdfUrl);
+            setPdfUrl(null);
+            setStep('idle');
+        }
+    }, [isOpen, pdfUrl]);
+
+    const handleGenerate = async () => {
+        setStep('generating');
+        let msgIndex = 0;
+        setLoadingMessage(messages[0]);
+
+        // Cycle through messages while loading
+        const interval = setInterval(() => {
+            msgIndex = (msgIndex + 1) % messages.length;
+            setLoadingMessage(messages[msgIndex]);
+        }, 1800);
+
+        try {
+            const blob = await jobsService.generateCoverLetter(jobDescription);
+            const url = window.URL.createObjectURL(blob);
+            setPdfUrl(url);
+            setStep('preview');
+        } catch (error) {
+            console.error("Failed to generate cover letter:", error);
+            alert("Erreur lors de la génération de la lettre de motivation. Veuillez réessayer.");
+            setStep('idle');
+        } finally {
+            clearInterval(interval);
+        }
+    };
+
+    const handleDownload = () => {
+        if (!pdfUrl) return;
+        const a = document.createElement('a');
+        a.href = pdfUrl;
+        a.download = `Lettre_Motivation_${jobTitle.replace(/[^a-z0-9]/gi, '_').substring(0, 20)}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setIsOpen(false);
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>
+                <Button
+                    variant="outline"
+                    size="lg"
+                    className="rounded-full h-12 px-6 border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors"
+                >
+                    <Mail className="w-4 h-4 mr-2" />
+                    Générer Lettre de Motivation
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden bg-white">
+                <DialogHeader className="px-6 py-4 border-b border-gray-100 bg-white z-10">
+                    <DialogTitle className="flex items-center gap-2 text-xl font-serif">
+                        <Sparkles className="w-5 h-5 text-blue-500" />
+                        Lettre de Motivation Personnalisée
+                    </DialogTitle>
+                    <DialogDescription>
+                        Générez une lettre de motivation en français adaptée à ce poste.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="flex-1 bg-gray-50/50 relative overflow-hidden flex flex-col">
+                    {step === 'idle' && (
+                        <div className="flex flex-col items-center justify-center h-full p-12 text-center text-gray-500 space-y-6">
+                            <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-2">
+                                <Mail className="w-10 h-10 text-blue-500" />
+                            </div>
+                            <div className="max-w-md space-y-2">
+                                <h3 className="text-lg font-serif text-gray-900">Lettre professionnelle en un clic</h3>
+                                <p>
+                                    Notre IA va analyser l'offre <strong>{jobTitle}</strong> et rédiger une lettre de motivation
+                                    convaincante qui met en valeur votre profil et votre motivation.
+                                </p>
+                            </div>
+                            <Button onClick={handleGenerate} size="lg" className="rounded-full px-8 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200/50">
+                                <Sparkles className="w-4 h-4 mr-2" />
+                                Générer ma Lettre
+                            </Button>
+                        </div>
+                    )}
+
+                    {step === 'generating' && (
+                        <div className="flex flex-col items-center justify-center h-full p-12 text-center space-y-8 animate-in fade-in duration-500">
+                            <div className="relative">
+                                <div className="w-24 h-24 border-4 border-gray-100 border-t-blue-500 rounded-full animate-spin"></div>
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <Sparkles className="w-8 h-8 text-blue-500 animate-pulse" />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <h3 className="text-xl font-serif font-bold text-gray-900">{loadingMessage}</h3>
+                                <p className="text-sm text-gray-500">Notre IA rédige votre lettre...</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {step === 'preview' && pdfUrl && (
+                        <div className="w-full h-full flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            <iframe
+                                src={pdfUrl}
+                                className="w-full flex-1 border-0 bg-gray-100"
+                                title="Cover Letter Preview"
+                            />
+                        </div>
+                    )}
+                </div>
+
+                <DialogFooter className="px-6 py-4 border-t border-gray-100 bg-white">
+                    <Button variant="ghost" onClick={() => setIsOpen(false)}>
+                        Annuler
+                    </Button>
+                    {step === 'preview' && (
+                        <Button onClick={handleDownload} className="bg-blue-600 hover:bg-blue-700 text-white">
+                            <Download className="w-4 h-4 mr-2" />
+                            Télécharger le PDF
+                        </Button>
+                    )}
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 function JobCard({ job, isSelected, onClick }: { job: JobOffer; isSelected: boolean; onClick: () => void }) {
     const matchColor = job.relevance_score && job.relevance_score >= 80 ? "bg-emerald-500" : "bg-yellow-500";
     const matchTextColor = job.relevance_score && job.relevance_score >= 80 ? "text-emerald-600" : "text-yellow-600";
@@ -336,8 +480,11 @@ function JobDetail({ job }: { job: JobOffer | null }) {
                         </div>
                     </div>
 
-                    <div className="flex gap-3 shrink-0">
-                        <TailorResumeDialog jobDescription={job.description} jobTitle={job.intitule} />
+                    <div className="flex flex-col gap-3 shrink-0">
+                        <div className="flex gap-3">
+                            <TailorResumeDialog jobDescription={job.description} jobTitle={job.intitule} />
+                            <GenerateCoverLetterDialog jobDescription={job.description} jobTitle={job.intitule} />
+                        </div>
 
                         {applyUrl && (
                             <Button asChild size="lg" className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 px-8 h-12 text-base font-medium transition-transform hover:-translate-y-0.5">

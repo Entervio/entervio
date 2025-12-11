@@ -30,7 +30,6 @@ export const jobsService = {
     search: async (keywords: string, location?: string): Promise<JobOffer[]> => {
         const params = new URLSearchParams({ keywords });
         if (location) params.append("location", location);
-
         const response = await api.get(`/jobs/search?${params.toString()}`);
         return response.data;
     },
@@ -39,7 +38,6 @@ export const jobsService = {
         const params = new URLSearchParams();
         if (location) params.append("location", location);
         if (query) params.append("query", query);
-
         const response = await api.get(`/jobs/smart-search?${params.toString()}`);
         return response.data;
     },
@@ -53,14 +51,13 @@ export const jobsService = {
     tailorResume: async (jobDescription: string): Promise<Blob> => {
         const user = await api.get("/auth/me").then(r => r.data).catch(() => null);
         if (!user) throw new Error("User not authenticated");
-
-        // We use fetch directly because api.post expects JSON response
+        
         const token = window.localStorage.getItem("supabase.access_token");
         const headers: HeadersInit = {
             "Content-Type": "application/json",
             ...(token ? { Authorization: `Bearer ${token}` } : {})
         };
-
+        
         const response = await fetch("/api/v1/resume/tailor", {
             method: "POST",
             headers,
@@ -69,11 +66,33 @@ export const jobsService = {
                 job_description: jobDescription
             })
         });
-
+        
         if (!response.ok) {
             throw new Error(`Failed to tailor resume: ${response.status}`);
         }
+        
+        return response.blob();
+    },
 
+    generateCoverLetter: async (jobDescription: string): Promise<Blob> => {
+        const token = window.localStorage.getItem("supabase.access_token");
+        const headers: HeadersInit = {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+        };
+        
+        const response = await fetch("/api/v1/resume/cover-letter", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+                job_description: jobDescription
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Failed to generate cover letter: ${response.status}`);
+        }
+        
         return response.blob();
     }
 };

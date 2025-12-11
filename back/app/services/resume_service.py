@@ -128,6 +128,19 @@ class ResumeParserService:
             sys_inputs={"resume_data": json.dumps(resume_data, ensure_ascii=False)},
         )
 
+    def _compile_cover_letter_pdf(self, cover_letter_data: dict[str, Any]) -> bytes:
+        """
+        Compiles a cover letter PDF using the Fireside template.
+        """
+        template_path = Path(__file__).parent.parent / "templates" / "cover_letter.typ"
+
+        return typst.compile(
+            template_path,
+            sys_inputs={
+                "cover_letter_data": json.dumps(cover_letter_data, ensure_ascii=False)
+            },
+        )
+
     async def tailor_resume(
         self, db: Session, user_id: int, job_description: str
     ) -> bytes:
@@ -230,6 +243,132 @@ class ResumeParserService:
             logger.error(f"Data causing error: {json.dumps(tailored_data, indent=2)}")
             raise e
 
+    async def generate_cover_letter(
+        self,
+        db: Session,
+        user_id: int,
+        job_description: str,
+    ) -> bytes:
+        """
+        Generates a custom French cover letter using a custom template.
+        Company information is extracted from the job description by the LLM.
+
+        Args:
+            db: Database session
+            user_id: User ID
+            job_description: Job description to tailor the cover letter to
+
+        Returns:
+            PDF bytes of the generated cover letter
+        """
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise ValueError("User not found")
+
+        if not llm_service.groq_client:
+            raise ValueError("Groq client not initialized")
+
+        # Prepare user context for LLM
+        user_context = {
+            "name": user.name,
+            "email": user.email,
+            "phone": user.phone,
+            "work_experience": [
+                {
+                    "company": w.company,
+                    "role": w.role,
+                    "duration": f"{w.start_date} - {w.end_date}",
+                    "description": w.description,
+                }
+                for w in user.work_experiences[:3]  # Top 3 experiences
+            ],
+            "skills": {
+                "technical": [
+                    s.name for s in user.skills_list if s.category == "technical"
+                ][:8],
+                "soft": [s.name for s in user.skills_list if s.category == "soft"][:5],
+            },
+            "education": [
+                {
+                    "institution": e.institution,
+                    "degree": e.degree,
+                }
+                for e in user.educations[:2]  # Top 2 education entries
+            ],
+            "projects": [
+                {
+                    "name": p.name,
+                    "tech_stack": p.tech_stack,
+                    "details": p.details,
+                }
+                for p in user.projects[:2]  # Top 2 projects
+            ],
+        }
+
+        # Generate cover letter content using LLM
+        prompt = prompt_manager.format_prompt(
+            "cover_letter.generation",
+            job_description=job_description,
+            user_data=json.dumps(user_context, indent=2, ensure_ascii=False),
+        )
+
+        system = prompt_manager.format_prompt("cover_letter.system")
+
+        try:
+            completion = llm_service.groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": system,
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.7,
+            )
+
+            cover_letter_content = json.loads(completion.choices[0].message.content)
+            logger.info("Cover letter content generated successfully with Groq")
+        except Exception as e:
+            logger.error(f"Error generating cover letter: {e}")
+            # Fallback to a basic template
+            cover_letter_content = {
+                "greeting": "Madame, Monsieur,",
+                "body": """Je me permets de vous adresser ma candidature pour le poste proposé au sein de votre entreprise. Votre offre a particulièrement retenu mon attention car elle correspond parfaitement à mon profil et à mes aspirations professionnelles.
+
+Fort de mon expérience et de mes compétences techniques, je suis convaincu de pouvoir contribuer efficacement à vos projets et objectifs. Mon parcours professionnel m'a permis de développer une expertise solide et une capacité d'adaptation que je souhaite mettre au service de votre entreprise.
+
+Je reste à votre disposition pour un entretien afin de vous présenter plus en détail ma motivation et mes compétences.""",
+                "closing": "Cordialement,",
+            }
+
+        user_details_parts = [user.name]
+        if user.phone:
+            user_details_parts.append(user.phone)
+        if user.email:
+            user_details_parts.append(user.email)
+
+        from_details = "\n".join(user_details_parts)
+
+        cover_letter_data = {
+            "from_details": from_details,
+            "greeting": cover_letter_content.get("greeting", "Madame, Monsieur,"),
+            "body": cover_letter_content.get("body", ""),
+            "closing": cover_letter_content.get("closing", "Cordialement,"),
+        }
+
+        # Compile PDF
+        logger.info("Compiling cover letter PDF with Typst...")
+        try:
+            return self._compile_cover_letter_pdf(cover_letter_data)
+        except Exception as e:
+            logger.error(f"Typst Compilation Error: {e}")
+            logger.error(
+                f"Data causing error: {json.dumps(cover_letter_data, indent=2)}"
+            )
+            raise e
+
     async def upload_resume(
         self,
         file: UploadFile,
@@ -261,7 +400,6 @@ class ResumeParserService:
                 raise HTTPException(status_code=500, detail=parsed_data["error"])
 
             # Populate Work Experience
-            # Populate Work Experience
             for exp in parsed_data.get("work_experience", []):
                 db.add(
                     WorkExperience(
@@ -276,7 +414,6 @@ class ResumeParserService:
                 )
 
             # Populate Education
-            # Populate Education
             for edu in parsed_data.get("education", []):
                 db.add(
                     Education(
@@ -290,7 +427,6 @@ class ResumeParserService:
                     )
                 )
 
-            # Populate Projects
             # Populate Projects
             for proj in parsed_data.get("projects", []):
                 db.add(

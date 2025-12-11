@@ -2,5 +2,7 @@ from pydantic import BaseModel
 
 
 class TailorRequest(BaseModel):
-    user_id: int
+    job_description: str
+
+class CoverLetterRequest(BaseModel):
     job_description: str

@@ -1,5 +1,3 @@
-"""Interview REST API Endpoints"""
-
 import logging
 import os
 import tempfile

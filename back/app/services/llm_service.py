@@ -66,6 +66,7 @@ class SearchJobsArgs(BaseModel):
 # Setup logging
 logger = logging.getLogger(__name__)
 
+
 def get_system_prompt(
     interviewer_type: InterviewerStyle,
     candidate_context: str = "",
@@ -155,7 +156,8 @@ class LLMService:
         )
 
         return prompt_manager.format_prompt(
-            f"interview.greetings.{interviewer_type}", candidate_name=candidate_name
+            f"interview.greetings.{interviewer_type.value}",
+            candidate_name=candidate_name,
         )
 
     async def chat(
@@ -583,7 +585,24 @@ class LLMService:
                                 f"❌ Pydantic validation failed for search_jobs args: {e}"
                             )
                             continue
+                        try:
+                            raw_args = json.loads(tool_call.function.arguments)
+                            validated_args = SearchJobsArgs.model_validate(raw_args)
+                            logger.info(
+                                f"📞 Calling search_jobs with validated args: {validated_args.model_dump(exclude_none=True)}"
+                            )
+                        except json.JSONDecodeError as e:
+                            logger.error(
+                                f"❌ Failed to parse tool call arguments as JSON: {e}"
+                            )
+                            continue
+                        except Exception as e:
+                            logger.error(
+                                f"❌ Pydantic validation failed for search_jobs args: {e}"
+                            )
+                            continue
 
+                        # Call the imported function with validated args
                         # Call the imported function with validated args
                         # search_jobs returns a JSON string
                         jobs_json = await search_jobs.fn(
@@ -609,7 +628,14 @@ class LLMService:
             unique_jobs = list(
                 {job["id"]: job for job in all_found_jobs if job.get("id")}.values()
             )
+            unique_jobs = list(
+                {job["id"]: job for job in all_found_jobs if job.get("id")}.values()
+            )
 
+            logger.info(
+                f"✅ Extracted {len(unique_jobs)} unique jobs from tool execution"
+            )
+            return unique_jobs
             logger.info(
                 f"✅ Extracted {len(unique_jobs)} unique jobs from tool execution"
             )
