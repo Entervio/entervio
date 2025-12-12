@@ -16,6 +16,8 @@ import {
   PhoneOff,
   Volume2,
   MoreVertical,
+  SkipForward,
+  RotateCcw,
 } from "lucide-react";
 
 export function meta({ }: Route.MetaArgs) {
@@ -49,6 +51,8 @@ export default function Interview() {
     endInterview,
     setError,
     cleanup,
+    skipAudio,
+    replayLastAudio,
   } = useInterviewStore();
 
   useEffect(() => {
@@ -74,6 +78,14 @@ export default function Interview() {
   const handleEndInterview = async () => {
     await endInterview();
     navigate(`/interview/${sessionId}/feedback`);
+  };
+
+  const handleAudioControl = () => {
+    if (isPlayingAudio) {
+      skipAudio();
+    } else {
+      replayLastAudio();
+    }
   };
 
   if (isLoading) {
@@ -129,12 +141,12 @@ export default function Interview() {
         </div>
 
         <Button
-          variant="ghost"
-          size="icon"
-          className="rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
+          size="lg"
+          className="rounded-full bg-destructive hover:bg-destructive/90 text-destructive-foreground shadow-lg h-12 px-6 gap-2"
           onClick={handleEndInterview}
         >
           <PhoneOff className="w-5 h-5" />
+          <span className="font-medium">Raccrocher</span>
         </Button>
       </header>
 
@@ -228,7 +240,20 @@ export default function Interview() {
             )}
           </Button>
 
-          <div className="w-10" /> {/* Spacer for balance if needed, or add another button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-xl text-muted-foreground hover:text-foreground disabled:opacity-50"
+            onClick={handleAudioControl}
+            disabled={!lastInterviewerMessage}
+            title={isPlayingAudio ? "Passer l'audio" : "Rejouer l'audio"}
+          >
+            {isPlayingAudio ? (
+              <SkipForward className="w-5 h-5" />
+            ) : (
+              <RotateCcw className="w-5 h-5" />
+            )}
+          </Button>
         </div>
       </div>
 

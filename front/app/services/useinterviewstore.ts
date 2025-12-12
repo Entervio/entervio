@@ -2,6 +2,10 @@ import { create } from "zustand";
 import { interviewApi, ApiError } from "~/lib/api";
 import type { InterviewerType, Message } from "~/types/interview";
 
+interface AudioCache {
+  [text: string]: string; // text -> blob URL
+}
+
 interface InterviewStore {
   sessionId: string | null;
   candidateName: string;
@@ -14,7 +18,11 @@ interface InterviewStore {
   isPlayingAudio: boolean;
   questionCount: number;
   isLoading: boolean;
-  loadingInterviewId: string | null; // Add this
+  loadingInterviewId: string | null;
+
+  // Audio cache
+  audioCache: AudioCache;
+  lastAudioText: string | null;
 
   // Refs (stored in state for persistence)
   mediaRecorder: MediaRecorder | null;
@@ -25,6 +33,8 @@ interface InterviewStore {
   loadInterviewData: (interviewId: string) => Promise<boolean>;
   loadConversationHistory: (interviewId: string) => Promise<void>;
   playAudio: (sessionId: string, text: string) => Promise<void>;
+  skipAudio: () => void;
+  replayLastAudio: () => void;
   startRecording: () => Promise<void>;
   stopRecording: () => void;
   processRecording: () => Promise<void>;
@@ -46,7 +56,9 @@ const initialState = {
   isPlayingAudio: false,
   questionCount: 0,
   isLoading: true,
-  loadingInterviewId: null, // Add this
+  loadingInterviewId: null,
+  audioCache: {} as AudioCache,
+  lastAudioText: null,
   mediaRecorder: null,
   audioChunks: [] as Blob[],
   currentAudio: null,
@@ -130,7 +142,7 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
 
   playAudio: async (sessionId: string, text: string) => {
     try {
-      set({ isPlayingAudio: true });
+      set({ isPlayingAudio: true, lastAudioText: text });
 
       // Stop current audio if playing
       const { currentAudio } = get();
@@ -138,7 +150,26 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
         currentAudio.pause();
       }
 
-      const audioUrl = await interviewApi.getAudio(sessionId, text);
+      // Check cache first
+      const { audioCache } = get();
+      let audioUrl: string;
+
+      if (audioCache[text]) {
+        console.log("Using cached audio for:", text.substring(0, 50));
+        audioUrl = audioCache[text];
+      } else {
+        console.log("Fetching new audio for:", text.substring(0, 50));
+        audioUrl = await interviewApi.getAudio(sessionId, text);
+        
+        // Cache the audio URL
+        set((state) => ({
+          audioCache: {
+            ...state.audioCache,
+            [text]: audioUrl,
+          },
+        }));
+      }
+
       const audio = new Audio(audioUrl);
       set({ currentAudio: audio });
 
@@ -146,13 +177,12 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
 
       await new Promise<void>((resolve, reject) => {
         audio.onended = () => {
-          URL.revokeObjectURL(audio.src);
+          // Don't revoke cached URLs
           set({ isPlayingAudio: false });
           resolve();
         };
         audio.onerror = (e) => {
           console.error("Audio playback error:", e);
-          URL.revokeObjectURL(audio.src);
           set({ isPlayingAudio: false });
           reject(e);
         };
@@ -160,6 +190,27 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
     } catch (err) {
       console.error("Error playing audio:", err);
       set({ isPlayingAudio: false });
+    }
+  },
+
+  skipAudio: () => {
+    const { currentAudio } = get();
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+      set({ isPlayingAudio: false });
+    }
+  },
+
+  replayLastAudio: async () => {
+    const { lastAudioText, sessionId, isPlayingAudio } = get();
+    
+    if (isPlayingAudio) {
+      return; // Don't replay if already playing
+    }
+
+    if (lastAudioText && sessionId) {
+      await get().playAudio(sessionId, lastAudioText);
     }
   },
 
@@ -282,11 +333,20 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
   },
 
   cleanup: () => {
-    const { currentAudio } = get();
+    const { currentAudio, audioCache } = get();
+    
+    // Stop current audio
     if (currentAudio) {
       currentAudio.pause();
       set({ currentAudio: null });
     }
+
+    // Revoke all cached audio URLs to free memory
+    Object.values(audioCache).forEach((url) => {
+      URL.revokeObjectURL(url);
+    });
+    
+    set({ audioCache: {} });
   },
 
   reset: () => {
