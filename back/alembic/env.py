@@ -1,18 +1,16 @@
 from logging.config import fileConfig
+
 from sqlalchemy import engine_from_config, pool
+
 from alembic import context
+
+# Import settings to get DATABASE_URL
+from app.core.config import settings
 
 # Import your Base
 from app.db import Base
 
 # CRITICAL: Import ALL your models here so Alembic can detect them
-from app.models.interview import Interview
-from app.models.question_answer import QuestionAnswer
-from app.models.user import User
-from app.models.resume_models import WorkExperience, Education, Project, Language, Skill
-
-# Import settings to get DATABASE_URL
-from app.core.config import settings
 
 # Alembic Config object
 config = context.config
@@ -27,6 +25,7 @@ if config.config_file_name is not None:
 # Set target metadata - this is what Alembic uses to detect your tables
 target_metadata = Base.metadata
 
+
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
@@ -38,6 +37,7 @@ def run_migrations_offline() -> None:
     with context.begin_transaction():
         context.run_migrations()
 
+
 def run_migrations_online() -> None:
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
@@ -45,12 +45,10 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, 
-            target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():
             context.run_migrations()
+
 
 if context.is_offline_mode():
     run_migrations_offline()

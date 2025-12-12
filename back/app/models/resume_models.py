@@ -64,7 +64,7 @@ class Project(Base):
     role = Column(String, nullable=True)
     start_date = Column(String, nullable=True)
     end_date = Column(String, nullable=True)
-    tech_stack = Column(String, nullable=True)  # Comma separated or just string
+    tech_stack = Column(String, nullable=True)
     details = Column(Text, nullable=True)
 
     user = relationship("User", back_populates="projects")
