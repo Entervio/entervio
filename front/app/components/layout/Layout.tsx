@@ -7,7 +7,7 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
-  const isSearchPage = location.pathname.startsWith("/jobs/search");
+  const isSearchPage = location.pathname.startsWith("/jobs");
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/20">

@@ -4,6 +4,7 @@ from typing import Any
 from app.mcp.server import search_jobs
 from app.models.user import User
 from app.services.llm_service import llm_service
+from app.services.ranking_service import ranking_service
 
 logger = logging.getLogger(__name__)
 
@@ -62,11 +63,8 @@ class SmartJobService:
             logger.warning("⚠️ No jobs found via MCP search.")
             return []
 
-        # 4. Filter and Deduplicate (if multiple tool calls happened, the service should handle aggregation)
-        # But if search_with_tools returns the aggregated jobs, we are good.
-
         # 5. Rerank
-        reranked_jobs = await llm_service.compute_similarity_ranking(
+        reranked_jobs = await ranking_service.compute_similarity_ranking(
             profile_summary, found_jobs, query=query
         )
 
