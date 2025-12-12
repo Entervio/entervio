@@ -42,7 +42,7 @@ class Education(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     institution = Column(String, nullable=False)
-    degree = Column(String, nullable=False)
+    degree = Column(String, nullable=True)
     field_of_study = Column(String, nullable=True)
     start_date = Column(String, nullable=True)
     end_date = Column(String, nullable=True)
