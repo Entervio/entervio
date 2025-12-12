@@ -3,7 +3,7 @@
 **The Ultimate AI Career Copilot**  
 *Master your interview skills, build the perfect resume, and land your dream job.*
 
-Entervio is a comprehensive, full-stack platform designed to give candidates an unfair advantage. It combines **real-time voice AI** for mock interviews, **Typst-powered** resume generation, and integrated job search tools into a single, modern interface.
+Entervio is a comprehensive, full-stack platform designed to give candidates an unfair advantage. It combines **real-time voice AI** for mock interviews, **Typst-powered** resume generation, cover letter generation, and integrated job search tools into a single, modern interface.
 
 ![Entervio Dashboard](assets/screenshots/profile.png)
 
