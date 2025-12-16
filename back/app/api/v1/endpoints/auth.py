@@ -1,5 +1,3 @@
-"""Auth REST API Endpoints"""
-
 import httpx
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
