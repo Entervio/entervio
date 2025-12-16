@@ -22,6 +22,36 @@ function withAuthHeaders(init?: RequestInit): RequestInit {
   };
 }
 
+export interface FeedbackData {
+  overall_comment: string;
+  global_grade: number;
+  strengths: string[];
+  weaknesses: string[];
+  tips: string[];
+}
+
+export interface QuestionAnswer {
+  question: string;
+  answer: string | null;
+  grade: number | null;
+  feedback: string | null;
+}
+
+export interface InterviewSummaryResponse {
+  feedback: FeedbackData | null;
+  questions: QuestionAnswer[];
+}
+
+// Keep this for internal use in your store
+export interface InterviewSummary {
+  score: number;
+  strengths: string[];
+  weaknesses: string[];
+  tips: string[];
+  overall_comment: string;
+  questions: QuestionAnswer[];
+}
+
 export interface InterviewStartRequest {
   candidate_name: string;
   interviewer_type: "nice" | "neutral" | "mean";
@@ -75,13 +105,6 @@ export interface Interview {
   interviewer_style: string;
   question_count: number;
   grade: number;
-}
-
-export interface QuestionAnswer {
-  question: string;
-  answer: string;
-  grade: number;
-  feedback: string;
 }
 
 export interface InterviewSummary {
@@ -322,19 +345,17 @@ export const interviewApi = {
   /**
    * Get interview summary with feedback and grades
    */
-  async getInterviewSummary(interviewId: string): Promise<InterviewSummary> {
+  async getInterviewSummary(interviewId: string): Promise<InterviewSummaryResponse> {
     const response = await fetch(
       `${API_BASE_URL}/interviews/${interviewId}/summary`,
       withAuthHeaders(),
     );
-
     if (!response.ok) {
       throw new ApiError(
         response.status,
         `Failed to get interview summary: ${response.status}`
       );
     }
-
     return response.json();
   },
 

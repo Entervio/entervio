@@ -6,6 +6,8 @@ import logging
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.models.comment import FeedbackComment, FeedbackCommentType
+from app.models.feedback import Feedback
 from app.models.interview import Interview, InterviewerStyle
 from app.models.question_answer import QuestionAnswer
 from app.models.user import User
@@ -238,11 +240,10 @@ class InterviewService:
     async def end_interview(self, db: Session, interview_id: int, user_id: int) -> dict:
         """
         End interview session and generate summary.
-
         Args:
             db: Database session
             interview_id: Interview identifier
-
+            user_id: User identifier
         Returns:
             Dict with summary and interview details
         """
@@ -251,36 +252,79 @@ class InterviewService:
             interview = db.query(Interview).filter(Interview.id == interview_id).first()
             if not interview:
                 raise ValueError(f"Interview {interview_id} not found")
-
             if interview.user_id != user_id:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Not authorized to end this interview",
                 )
 
-            logger.info(f"👋 Ending interview {interview_id}")
+            logger.info(f"Ending interview {interview_id}")
 
+            # Handle last unanswered question
             last_qa = (
                 interview.question_answers[-1] if interview.question_answers else None
             )
             if last_qa and last_qa.answer is None:
                 last_qa.answer = "[Pas de réponse]"
 
+            # Build conversation history and get LLM feedback
             conversation_history = self._build_conversation_history(interview)
-
             summary = await self.llm_service.end_interview(
                 conversation_history, interview.interviewer_style
             )
 
-            interview.global_feedback = json.dumps(summary)
+            # Create Feedback record
+            feedback = Feedback(
+                interview_id=interview.id,
+                overall_comment=summary.get("overall_comment", ""),
+            )
+            db.add(feedback)
+            db.flush()  # Get feedback.id before adding comments
+
+            # Create FeedbackComment records
+            comment_order = 0
+
+            # Add strengths
+            for strength in summary.get("strengths", []):
+                comment = FeedbackComment(
+                    feedback_id=feedback.id,
+                    type=FeedbackCommentType.STRENGTH,
+                    content=strength,
+                    order_index=comment_order,
+                )
+                db.add(comment)
+                comment_order += 1
+
+            # Add weaknesses
+            for weakness in summary.get("weaknesses", []):
+                comment = FeedbackComment(
+                    feedback_id=feedback.id,
+                    type=FeedbackCommentType.WEAKNESS,
+                    content=weakness,
+                    order_index=comment_order,
+                )
+                db.add(comment)
+                comment_order += 1
+
+            # Add tips
+            for tip in summary.get("tips", []):
+                comment = FeedbackComment(
+                    feedback_id=feedback.id,
+                    type=FeedbackCommentType.TIP,
+                    content=tip,
+                    order_index=comment_order,
+                )
+                db.add(comment)
+                comment_order += 1
 
             db.commit()
+            logger.info(f"Interview ended: {interview_id}")
 
-            logger.info(f"✅ Interview ended: {interview_id}")
+            return summary
 
         except Exception as e:
             db.rollback()
-            logger.error(f"❌ Error ending interview: {str(e)}")
+            logger.error(f"Error ending interview: {str(e)}")
             raise
 
     def get_interview_list(
@@ -429,14 +473,49 @@ class InterviewService:
             its individual feedback
         """
         interview = db.query(Interview).filter(Interview.id == interview_id).first()
-
-        logger.info(f"🔍 Fetching summary for interview {interview_id}")
+        logger.info(f"Fetching summary for interview {interview_id}")
 
         if not interview:
             return None
 
+        # Calculate global grade as mean of all question grades
+        total_grade = 0
+        graded_questions = 0
+        for qa in interview.question_answers:
+            if qa.grade is not None:
+                total_grade += qa.grade
+                graded_questions += 1
+
+        global_grade = (
+            total_grade / graded_questions if graded_questions > 0 else 0
+        )  # Changed to 0
+
+        # Build feedback structure from Feedback and FeedbackComment
+        feedback_data = None
+        if interview.feedback:
+            # Group comments by type
+            strengths = []
+            weaknesses = []
+            tips = []
+
+            for comment in interview.feedback.comments:
+                if comment.type == FeedbackCommentType.STRENGTH:
+                    strengths.append(comment.content)
+                elif comment.type == FeedbackCommentType.WEAKNESS:
+                    weaknesses.append(comment.content)
+                elif comment.type == FeedbackCommentType.TIP:
+                    tips.append(comment.content)
+
+            feedback_data = {
+                "overall_comment": interview.feedback.overall_comment,
+                "global_grade": global_grade,
+                "strengths": strengths,
+                "weaknesses": weaknesses,
+                "tips": tips,
+            }
+
         # Build the summary dictionary
-        summary = {"feedback": interview.global_feedback, "questions": []}
+        summary = {"feedback": feedback_data, "questions": []}
 
         # Loop over question_answers and append each Q&A with feedback
         for qa in interview.question_answers:

@@ -10,7 +10,13 @@ from app.core.config import settings
 # Import your Base
 from app.db import Base
 
-# CRITICAL: Import ALL your models here so Alembic can detect them
+# ruff: noqa: F401
+from app.models.comment import FeedbackComment
+from app.models.feedback import Feedback
+from app.models.interview import Interview
+from app.models.question_answer import QuestionAnswer
+from app.models.resume_models import Education, Language, Project, Skill, WorkExperience
+from app.models.user import User
 
 # Alembic Config object
 config = context.config

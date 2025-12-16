@@ -33,6 +33,13 @@ class Interview(Base):
     # Relationship to candidate
     user = relationship("User", back_populates="interviews")
 
+    feedback = relationship(
+        "Feedback",
+        back_populates="interview",
+        uselist=False,  # One-to-one relationship
+        cascade="all, delete-orphan",
+    )
+
     # Relationship to question_answers
     question_answers = relationship(
         "QuestionAnswer",

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { interviewApi, ApiError } from "~/lib/api";
-import type { InterviewSummary } from "~/lib/api";
+import type { InterviewSummary, InterviewSummaryResponse } from "~/lib/api";
 
 interface FeedbackStore {
   summary: InterviewSummary | null;
@@ -24,50 +24,50 @@ export const useFeedbackStore = create<FeedbackStore>((set) => ({
     set({ loading: true, error: null });
 
     try {
-      const data = await interviewApi.getInterviewSummary(interviewId);
-
+      const data: InterviewSummaryResponse = await interviewApi.getInterviewSummary(interviewId);
       let finalSummary: InterviewSummary;
 
-      // Check if we have legacy data (feedback string but no score)
-      if (data && typeof (data as any).feedback === 'string' && (data as any).score === undefined) {
-        const feedbackString = (data as any).feedback;
-        try {
-          const parsed = JSON.parse(feedbackString);
-          finalSummary = {
-            ...data,
-            ...parsed,
-            questions: (data as any).questions || []
-          } as InterviewSummary;
-        } catch (e) {
-          // Legacy text feedback that isn't JSON
-          finalSummary = {
-            score: 0,
-            strengths: [],
-            weaknesses: [],
-            tips: [],
-            overall_comment: feedbackString,
-            questions: (data as any).questions || []
-          } as InterviewSummary;
-        }
-      } else if (data && (data as any).score !== undefined) {
-        // New format already
-        finalSummary = data;
-      } else {
-        // Unexpected format or null data
+      console.log("data is ", data);
+
+      if (!data) {
         finalSummary = {
           score: 0,
           strengths: [],
           weaknesses: [],
           tips: [],
-          overall_comment: "Feedback non disponible ou dans un format inattendu.",
+          overall_comment: "Feedback non disponible.",
           questions: []
-        } as InterviewSummary;
+        };
+        set({ summary: finalSummary, loading: false });
+        return;
+      }
+
+      // New structure: feedback is an object
+      if (data.feedback) {
+        finalSummary = {
+          score: data.feedback.global_grade ?? 0,
+          strengths: data.feedback.strengths || [],
+          weaknesses: data.feedback.weaknesses || [],
+          tips: data.feedback.tips || [],
+          overall_comment: data.feedback.overall_comment || "Aucun commentaire disponible.",
+          questions: data.questions || []
+        };
+      }
+      // Feedback is null (interview not ended yet)
+      else {
+        finalSummary = {
+          score: 0,
+          strengths: [],
+          weaknesses: [],
+          tips: [],
+          overall_comment: "L'entretien n'est pas encore terminé.",
+          questions: data.questions || []
+        };
       }
 
       set({ summary: finalSummary, loading: false });
     } catch (err) {
       console.error("Error fetching summary:", err);
-
       if (err instanceof ApiError) {
         set({
           error: err.status === 404
