@@ -23,8 +23,8 @@ class WorkExperience(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
-    company = Column(String, nullable=False)
-    role = Column(String, nullable=False)
+    company = Column(String, nullable=True)
+    role = Column(String, nullable=True)
     location = Column(String, nullable=True)
     start_date = Column(
         String, nullable=True
@@ -41,7 +41,7 @@ class Education(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
-    institution = Column(String, nullable=False)
+    institution = Column(String, nullable=True)
     degree = Column(String, nullable=True)
     field_of_study = Column(String, nullable=True)
     start_date = Column(String, nullable=True)
@@ -60,7 +60,7 @@ class Project(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
-    name = Column(String, nullable=False)
+    name = Column(String, nullable=True)
     role = Column(String, nullable=True)
     start_date = Column(String, nullable=True)
     end_date = Column(String, nullable=True)
@@ -76,7 +76,7 @@ class Language(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
-    name = Column(String, nullable=False)
+    name = Column(String, nullable=True)
     proficiency = Column(String, nullable=True)  # e.g., 'Native', 'Fluent', 'B2'
 
     user = relationship("User", back_populates="languages")
@@ -88,7 +88,7 @@ class Skill(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
-    name = Column(String, nullable=False)
+    name = Column(String, nullable=True)
     category = Column(String, nullable=True)  # 'technical', 'soft', 'tool'
 
     user = relationship("User", back_populates="skills_list")
