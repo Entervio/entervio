@@ -18,6 +18,7 @@ export default function InterviewDetail() {
   useEffect(() => {
     if (interviewId) {
       fetchSummary(interviewId);
+      console.log(summary);
     }
   }, [interviewId, fetchSummary]);
 

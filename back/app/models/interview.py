@@ -37,7 +37,7 @@ class Interview(Base):
         "Feedback",
         back_populates="interview",
         uselist=False,  # One-to-one relationship
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
     )
 
     # Relationship to question_answers

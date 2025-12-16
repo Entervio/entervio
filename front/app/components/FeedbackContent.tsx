@@ -5,9 +5,9 @@ import { cn } from "~/lib/utils";
 
 interface QuestionAnswer {
   question: string;
-  answer: string;
-  grade: number;
-  feedback: string;
+  answer: string | null;
+  grade: number | null;
+  feedback: string | null;
 }
 
 interface InterviewSummary {
@@ -64,21 +64,6 @@ export function FeedbackContent({ summary, loading, error }: FeedbackContentProp
     );
   }
 
-  // Safe access to properties with fallbacks for legacy data
-  const safeSummary = {
-    score: summary.score ?? 0,
-    strengths: summary.strengths ?? [],
-    weaknesses: summary.weaknesses ?? [],
-    tips: summary.tips ?? [],
-    overall_comment: summary.overall_comment ?? (typeof summary === 'string' ? summary : "Pas de commentaire global."),
-    questions: summary.questions ?? []
-  };
-
-  // If we have legacy data (no score/strengths but maybe just feedback text in a different field or just missing),
-  // we might want to show a legacy view or just the safe view.
-  // If summary was just a string in the past, the parent might be passing it wrongly.
-  // Let's assume safeSummary fixes the crash.
-
   return (
     <div className="space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
 
@@ -104,13 +89,13 @@ export function FeedbackContent({ summary, loading, error }: FeedbackContentProp
             <div className="text-sm font-medium text-muted-foreground uppercase tracking-widest mb-2">Score Global</div>
             <div className="flex items-baseline gap-1">
               <span className={cn("text-6xl font-bold font-serif", summary.score >= 8 ? "text-emerald-600" : summary.score >= 5 ? "text-amber-600" : "text-red-600")}>
-                {summary.score}
+                {summary.score.toFixed(1)}
               </span>
               <span className="text-2xl text-muted-foreground font-light">/10</span>
             </div>
             <div className="mt-4 flex gap-1">
               {[...Array(10)].map((_, i) => (
-                <div key={i} className={cn("w-1.5 h-8 rounded-full transition-all", i < summary.score ? (summary.score >= 8 ? "bg-emerald-500" : summary.score >= 5 ? "bg-amber-500" : "bg-red-500") : "bg-muted")} />
+                <div key={i} className={cn("w-1.5 h-8 rounded-full transition-all", i < Math.round(summary.score) ? (summary.score >= 8 ? "bg-emerald-500" : summary.score >= 5 ? "bg-amber-500" : "bg-red-500") : "bg-muted")} />
               ))}
             </div>
           </div>
@@ -146,14 +131,18 @@ export function FeedbackContent({ summary, loading, error }: FeedbackContentProp
             </div>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-3">
-              {summary.strengths.map((item, i) => (
-                <li key={i} className="flex gap-3 text-sm text-foreground/80">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
+            {summary.strengths.length > 0 ? (
+              <ul className="space-y-3">
+                {summary.strengths.map((item, i) => (
+                  <li key={i} className="flex gap-3 text-sm text-foreground/80">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">Aucun point fort identifié</p>
+            )}
           </CardContent>
         </Card>
 
@@ -166,14 +155,18 @@ export function FeedbackContent({ summary, loading, error }: FeedbackContentProp
             </div>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-3">
-              {summary.weaknesses.map((item, i) => (
-                <li key={i} className="flex gap-3 text-sm text-foreground/80">
-                  <AlertCircle className="h-5 w-5 text-amber-500 shrink-0" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
+            {summary.weaknesses.length > 0 ? (
+              <ul className="space-y-3">
+                {summary.weaknesses.map((item, i) => (
+                  <li key={i} className="flex gap-3 text-sm text-foreground/80">
+                    <AlertCircle className="h-5 w-5 text-amber-500 shrink-0" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">Aucun point d'amélioration identifié</p>
+            )}
           </CardContent>
         </Card>
 
@@ -186,14 +179,18 @@ export function FeedbackContent({ summary, loading, error }: FeedbackContentProp
             </div>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-3">
-              {summary.tips.map((item, i) => (
-                <li key={i} className="flex gap-3 text-sm text-foreground/80">
-                  <Lightbulb className="h-5 w-5 text-blue-500 shrink-0" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
+            {summary.tips.length > 0 ? (
+              <ul className="space-y-3">
+                {summary.tips.map((item, i) => (
+                  <li key={i} className="flex gap-3 text-sm text-foreground/80">
+                    <Lightbulb className="h-5 w-5 text-blue-500 shrink-0" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">Aucun conseil disponible</p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -221,11 +218,13 @@ export function FeedbackContent({ summary, loading, error }: FeedbackContentProp
                       {qa.question}
                     </h3>
                   </div>
-                  <div className="flex items-center gap-2 bg-background px-4 py-2 rounded-full border border-border shadow-sm shrink-0 group-hover:scale-105 transition-transform duration-300">
-                    <Star className={cn("h-5 w-5", qa.grade >= 8 ? "text-emerald-500 fill-emerald-500" : qa.grade >= 5 ? "text-amber-500 fill-amber-500" : "text-red-500 fill-red-500")} />
-                    <span className="text-lg font-bold text-foreground">{qa.grade}</span>
-                    <span className="text-sm text-muted-foreground font-medium">/10</span>
-                  </div>
+                  {qa.grade !== null && (
+                    <div className="flex items-center gap-2 bg-background px-4 py-2 rounded-full border border-border shadow-sm shrink-0 group-hover:scale-105 transition-transform duration-300">
+                      <Star className={cn("h-5 w-5", qa.grade >= 8 ? "text-emerald-500 fill-emerald-500" : qa.grade >= 5 ? "text-amber-500 fill-amber-500" : "text-red-500 fill-red-500")} />
+                      <span className="text-lg font-bold text-foreground">{qa.grade}</span>
+                      <span className="text-sm text-muted-foreground font-medium">/10</span>
+                    </div>
+                  )}
                 </div>
               </CardHeader>
 
@@ -237,22 +236,24 @@ export function FeedbackContent({ summary, loading, error }: FeedbackContentProp
                     Votre réponse
                   </h4>
                   <p className="text-foreground/80 italic leading-relaxed">
-                    "{qa.answer}"
+                    {qa.answer ? `"${qa.answer}"` : <span className="text-muted-foreground">Pas de réponse fournie</span>}
                   </p>
                 </div>
 
                 {/* AI Feedback */}
-                <div className="bg-secondary/10 rounded-2xl p-6 border border-secondary/20">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Lightbulb className="h-5 w-5 text-emerald-600" />
-                    <h4 className="text-sm font-bold text-emerald-800 uppercase tracking-widest">
-                      Analyse & Conseils
-                    </h4>
+                {qa.feedback && (
+                  <div className="bg-secondary/10 rounded-2xl p-6 border border-secondary/20">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Lightbulb className="h-5 w-5 text-emerald-600" />
+                      <h4 className="text-sm font-bold text-emerald-800 uppercase tracking-widest">
+                        Analyse & Conseils
+                      </h4>
+                    </div>
+                    <p className="text-foreground/90 leading-relaxed">
+                      {qa.feedback}
+                    </p>
                   </div>
-                  <p className="text-foreground/90 leading-relaxed">
-                    {qa.feedback}
-                  </p>
-                </div>
+                )}
               </CardContent>
             </Card>
           ))}
