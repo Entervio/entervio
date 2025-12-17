@@ -1,16 +1,16 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
-import { User, Loader2, ChevronRight, Pencil, Briefcase } from "lucide-react";
+import { Loader2, ChevronRight, Pencil, Briefcase } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Badge } from "~/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { Separator } from "~/components/ui/separator";
 
 import type { UserDetailed } from "~/types/user";
 
 import { useAuth } from "~/context/AuthContext";
+import { authApi } from "~/lib/api";
 import { useNavigate } from "react-router";
 
 export default function Account() {
@@ -36,21 +36,12 @@ export default function Account() {
     if (!token) return;
 
     try {
-      const headers = new Headers();
-      headers.append("Authorization", `Bearer ${token}`);
-
-      const res = await fetch("http://localhost:8000/api/v1/auth/me", { headers });
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data);
-        setFormData({ first_name: data.first_name, last_name: data.last_name, phone: data.phone || "" });
-      } else {
-        if (res.status === 401) {
-          navigate("/login");
-        }
-      }
+      const res = await authApi.getMe();
+      setUser(res);
+      setFormData({ first_name: res.first_name, last_name: res.last_name, phone: res.phone || "" });
     } catch (error) {
       console.error("Failed to fetch user", error);
+      navigate("/login");
     } finally {
       setLoading(false);
     }
