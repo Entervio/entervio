@@ -52,22 +52,10 @@ export default function Account() {
     if (!token) return;
 
     try {
-      const headers = new Headers({
-        "Content-Type": "application/json",
-      });
-      headers.append("Authorization", `Bearer ${token}`);
-
-      const res = await fetch("http://localhost:8000/api/v1/auth/me", {
-        method: "PUT",
-        headers,
-        body: JSON.stringify(formData),
-      });
-
-      if (res.ok) {
-        const updated = await res.json();
-        setUser(updated);
-        setEditing(false);
-      }
+      const {first_name, last_name, phone} = formData;
+      const updated = await authApi.updateMe(first_name, last_name, phone);
+      setUser(updated);
+      setEditing(false);
     } catch (error) {
       console.error("Failed to update user", error);
     }

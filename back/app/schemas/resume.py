@@ -3,8 +3,8 @@ from pydantic import BaseModel, ConfigDict
 
 # --- Work Experience ---
 class WorkExperienceBase(BaseModel):
-    company: str
-    role: str
+    company: str | None = None
+    role: str | None = None
     location: str | None = None
     start_date: str | None = None
     end_date: str | None = None
@@ -24,8 +24,8 @@ class WorkExperience(WorkExperienceBase):
 
 # --- Education ---
 class EducationBase(BaseModel):
-    institution: str
-    degree: str
+    institution: str | None = None
+    degree: str | None = None
     field_of_study: str | None = None
     start_date: str | None = None
     end_date: str | None = None
@@ -46,7 +46,7 @@ class Education(EducationBase):
 
 # --- Project ---
 class ProjectBase(BaseModel):
-    name: str
+    name: str | None = None
     role: str | None = None
     start_date: str | None = None
     end_date: str | None = None
@@ -67,7 +67,7 @@ class Project(ProjectBase):
 
 # --- Language ---
 class LanguageBase(BaseModel):
-    name: str
+    name: str | None = None
     proficiency: str | None = None
 
 

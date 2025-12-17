@@ -523,4 +523,24 @@ export const authApi = {
 
     return response.json();
   },
+
+  async updateMe(first_name: string, last_name: string, phone: string): Promise<{id: number, first_name: string, last_name: string, phone: string, email: string, has_resume: boolean}> {
+    const response = await fetch(
+      `${API_BASE_URL}/auth/me`,{
+      method: "PUT",
+      headers: {"Content-Type": "application/json",
+        ...withAuthHeaders().headers},
+      body: JSON.stringify({
+        first_name,
+        last_name,
+        phone,
+      })
+      }
+    )
+    if (!response.ok) {
+      throw new ApiError(response.status, `Failed to get user profile: ${response.status}`);
+    }
+
+    return response.json();
+  }
 };
