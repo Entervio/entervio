@@ -19,7 +19,8 @@ import {
   Star,
   Calendar,
 } from "lucide-react";
-import { authApi, interviewApi, type Interview } from "~/lib/api";
+import { authApi } from "~/lib/api";
+import { interviewApi, type Interview } from "~/lib/interviewApi";
 import { cn } from "~/lib/utils";
 
 export function meta({ }: Route.MetaArgs) {

@@ -5,7 +5,7 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { useSetupStore } from "~/services/usesetupstore";
 import { authApi } from "~/lib/api";
-import { Loader2, Upload, CheckCircle, RefreshCw, ArrowRight, FileText, CheckCircle2 } from "lucide-react";
+import { Loader2, CheckCircle, RefreshCw, ArrowRight, FileText, CheckCircle2 } from "lucide-react";
 
 export function meta({ }: Route.MetaArgs) {
   return [
