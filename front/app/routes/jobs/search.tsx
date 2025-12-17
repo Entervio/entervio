@@ -1,41 +1,8 @@
 import { useState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
-import { Building2, Briefcase, ExternalLink, Sparkles, ChevronDown, ChevronUp, ArrowRight, Search, CheckCircle2, FileText, Loader2, Download, Mail } from "lucide-react";
+import { Building2, Briefcase, ExternalLink, Sparkles, ArrowRight, Search, FileText, Download, Mail } from "lucide-react";
 import { jobsService, type JobOffer } from "~/services/jobs";
 import { cn } from "~/lib/utils";
-
-function useTypewriter(phrases: string[], typingSpeed = 50, deletingSpeed = 30, pauseDuration = 2000) {
-    const [text, setText] = useState("");
-    const [isDeleting, setIsDeleting] = useState(false);
-    const [loopNum, setLoopNum] = useState(0);
-    const [typingSpeedState, setTypingSpeedState] = useState(typingSpeed);
-
-    useEffect(() => {
-        const handleTyping = () => {
-            const i = loopNum % phrases.length;
-            const fullText = phrases[i];
-
-            setText(isDeleting
-                ? fullText.substring(0, text.length - 1)
-                : fullText.substring(0, text.length + 1)
-            );
-
-            setTypingSpeedState(isDeleting ? deletingSpeed : typingSpeed);
-
-            if (!isDeleting && text === fullText) {
-                setTimeout(() => setIsDeleting(true), pauseDuration);
-            } else if (isDeleting && text === "") {
-                setIsDeleting(false);
-                setLoopNum(loopNum + 1);
-            }
-        };
-
-        const timer = setTimeout(handleTyping, typingSpeedState);
-        return () => clearTimeout(timer);
-    }, [text, isDeleting, loopNum, phrases, typingSpeed, deletingSpeed, pauseDuration, typingSpeedState]);
-
-    return text;
-}
 
 function formatSalary(salary: string): string {
     // Example: "Annuel de 35000.0 Euros à 39000.0 Euros sur 12.0 mois"
@@ -375,7 +342,6 @@ function GenerateCoverLetterDialog({ jobDescription, jobTitle }: { jobDescriptio
 }
 
 function JobCard({ job, isSelected, onClick }: { job: JobOffer; isSelected: boolean; onClick: () => void }) {
-    const matchColor = job.relevance_score && job.relevance_score >= 80 ? "bg-emerald-500" : "bg-yellow-500";
     const matchTextColor = job.relevance_score && job.relevance_score >= 80 ? "text-emerald-600" : "text-yellow-600";
 
     return (
