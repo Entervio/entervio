@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { ApiError } from "~/lib/api";
-import type { interviewApi, Interview } from "~/lib/interviewApi";
+import { interviewApi, type Interview } from "~/lib/interviewApi";
 
 interface InterviewListStore {
   interviews: Interview[];

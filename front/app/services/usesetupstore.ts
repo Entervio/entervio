@@ -54,10 +54,10 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
       if (user.has_resume) {
         set({
           candidateId: user.id,
-          candidateName: user.name || get().candidateName
+          candidateName: `${user.first_name} ${user.last_name}` || get().candidateName
         });
-      } else if (user.name) {
-        set({ candidateName: user.name });
+      } else if (user.first_name) {
+        set({ candidateName: `${user.first_name} ${user.last_name}` });
       }
     } catch (err) {
       console.error("Failed to fetch user profile:", err);

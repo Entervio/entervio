@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { interviewApi, ApiError } from "~/lib/api";
-import type { InterviewSummary, InterviewSummaryResponse } from "~/lib/api";
+import { ApiError } from "~/lib/api";
+import { interviewApi, type InterviewSummary, type InterviewSummaryResponse } from "~/lib/interviewApi";
 
 interface FeedbackStore {
   summary: InterviewSummary | null;
