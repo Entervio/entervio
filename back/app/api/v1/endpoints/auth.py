@@ -54,7 +54,6 @@ async def signup(payload: SignupRequest, db: DbSession):
                 json={
                     "email": payload.email,
                     "password": payload.password,
-                    "email_confirm": True,
                     "user_metadata": {
                         "first_name": payload.first_name,
                         "last_name": payload.last_name,
