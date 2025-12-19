@@ -14,6 +14,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 class SignupRequest(BaseModel):
     first_name: str = Field(..., min_length=1)
     last_name: str = Field(..., min_length=1)
+
     email: EmailStr
     password: str = Field(..., min_length=6)
     phone: str | None = None
