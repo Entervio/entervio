@@ -1,8 +1,11 @@
 import logging
 from contextlib import asynccontextmanager
 
+import sentry_sdk
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
 
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -28,6 +31,16 @@ async def lifespan(app: FastAPI):
     grading_service.shutdown(wait=True)
 
 
+sentry_sdk.init(
+    dsn=settings.SENTRY_DSN,
+    integrations=[
+        StarletteIntegration(transaction_style="endpoint"),
+        FastApiIntegration(transaction_style="endpoint"),
+    ],
+    traces_sample_rate=1.0,
+    environment="production",
+)
+
 app = FastAPI(
     title="Voice Interview API",
     description="AI-powered voice interview system",
@@ -49,7 +62,6 @@ app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 @app.get("/")
 def read_root():
     return {"message": "Welcome to Voice Interview API", "status": "running"}
-
 
 @app.get("/health")
 def health_check():
