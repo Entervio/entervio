@@ -517,7 +517,7 @@ function JobDetail({
     job.origineOffre?.urlOrigine;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm h-[calc(100vh-140px)] overflow-y-auto sticky top-4 custom-scrollbar">
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-y-auto sticky top-4 custom-scrollbar">
       <Button
         onClick={onBack}
         variant="ghost"
