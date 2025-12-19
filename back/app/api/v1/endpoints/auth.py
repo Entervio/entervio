@@ -40,7 +40,7 @@ async def signup(payload: SignupRequest, db: DbSession):
             detail="Supabase configuration is not set",
         )
 
-    supabase_auth_url = f"{settings.SUPABASE_URL}/auth/v1/admin/users"
+    supabase_auth_url = f"{settings.SUPABASE_URL}/auth/v1/signup"
 
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
@@ -57,7 +57,6 @@ async def signup(payload: SignupRequest, db: DbSession):
                     "user_metadata": {
                         "first_name": payload.first_name,
                         "last_name": payload.last_name,
-                        "email_confirm": True,
                         "phone": payload.phone,
                     },
                 },

@@ -20,10 +20,6 @@ def decode_supabase_token(token: str) -> dict[str, Any]:
     frontend to send the access token in the Authorization header.
     """
     try:
-        # Supabase access tokens are signed with the project's JWT secret.
-        # We verify the signature and basic structure here. By default,
-        # python-jose validates the `aud` claim when present, so we
-        # explicitly disable audience validation to avoid mismatches.
         payload = jwt.decode(
             token,
             settings.SUPABASE_JWT_SECRET,
@@ -63,7 +59,7 @@ async def get_current_user(
 def get_current_db_user(
     current_user: Annotated[dict[str, Any], Depends(get_current_user)],
     db: DbSession,
-) -> Any:
+) -> User:
     """
     Dependency that returns the local DB user.
     If the user exists in Supabase (valid token) but not in local DB,
@@ -78,6 +74,9 @@ def get_current_db_user(
         )
 
     user = db.query(User).filter(User.supabase_id == supabase_id).first()
+
+    # Get email verification status from the correct place in the Supabase token
+    email_verified = current_user.get("user_metadata", {}).get("email_verified", False)
 
     if not user:
         # Lazy creation
@@ -97,11 +96,26 @@ def get_current_db_user(
             first_name=user_metadata.get("first_name", email.split("@")[0]),
             last_name=user_metadata.get("last_name", ""),
             phone=user_metadata.get("phone"),
+            is_verified=email_verified,
         )
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
-        return new_user
+        user = new_user
+
+    # Sync email verification status from Supabase if it's not already set
+    if not user.is_verified and email_verified:
+        logger.info(f"User {user.id} confirmed their email. Updating local record.")
+        user.is_verified = True
+        db.commit()
+        db.refresh(user)
+
+    # Forbid access to unverified users
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email not verified. Please check your inbox for a confirmation link.",
+        )
 
     return user
 
