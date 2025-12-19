@@ -58,6 +58,7 @@ async def signup(payload: SignupRequest, db: DbSession):
                     "user_metadata": {
                         "first_name": payload.first_name,
                         "last_name": payload.last_name,
+                        "email_verified": True,
                         "phone": payload.phone,
                     },
                 },
