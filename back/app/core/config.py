@@ -1,3 +1,4 @@
+from google.auth import default
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -54,6 +55,8 @@ class Settings(BaseSettings):
     TTS_VOICE: str = Field(default="fr-FR-DeniseNeural")
     TTS_RATE: str = Field(default="+0%")
     TTS_VOLUME: str = Field(default="+0%")
+
+    SENTRY_DSN: str = Field(default="", env="SENTRY_DSN")
 
     # WebSocket
     WS_HEARTBEAT_INTERVAL: int = Field(default=30)
