@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+from fastapi.types import UnionType
+from pydantic.v1.fields import Undefined
 from sqlalchemy import Column, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -22,7 +24,7 @@ class User(Base):
     deleted_at = Column(DateTime, nullable=True)
     first_name: Mapped[str] = mapped_column(String, nullable=False)
     last_name: Mapped[str] = mapped_column(String, nullable=False)
-    email: Mapped[str] = mapped_column(String, nullable=False)
+    email: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     phone: Mapped[str] = mapped_column(String, nullable=True)
     is_verified: Mapped[bool] = mapped_column(default=False, nullable=False)
 
@@ -47,7 +49,7 @@ class User(Base):
 
     # Keeping raw_resume_text for backup/debug
     raw_resume_text = Column(Text, nullable=True)
-    supabase_id = Column(Text, nullable=True)
+    supabase_id = Column(Text, nullable=True, unique=True)
 
     interviews = relationship("Interview", back_populates="user")
 
