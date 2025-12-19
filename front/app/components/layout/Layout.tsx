@@ -9,15 +9,22 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const isSearchPage = location.pathname.startsWith("/jobs");
+  const isInterviewPage = location.pathname.startsWith("/interview");
   const isOnboardingPage = location.pathname === "/resume";
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/20">
       {!isOnboardingPage && <Navbar />}
-      <main className={isOnboardingPage ? "" : "bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-primary/5 via-background to-background"}>
+      <main
+        className={
+          isOnboardingPage
+            ? ""
+            : "bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-primary/5 via-background to-background"
+        }
+      >
         {children}
       </main>
-      {!isSearchPage && (
+      {!isSearchPage && !isInterviewPage && (
         <footer className="border-t border-border bg-background/50 backdrop-blur-sm">
           <div className="container mx-auto px-6 py-6">
             <div className="flex flex-col items-center gap-2 text-center">

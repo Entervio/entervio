@@ -141,14 +141,11 @@ export default function Interview() {
 
       {/* Header */}
       <header className="sticky top-0 left-0 right-0 z-50 p-6 flex justify-between items-center border-b border-border/50 bg-background/80 backdrop-blur-sm">
-        <div className="flex items-center gap-3 bg-background/50 backdrop-blur-md px-4 py-2 rounded-full border border-border/50 shadow-sm">
+        <div className="flex items-center gap-2 bg-background/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-border/50 shadow-sm">
           <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-          <span className="text-sm font-medium text-foreground/80">
-            En direct
-          </span>
-          <span className="text-border mx-1">|</span>
           <span className="text-sm text-muted-foreground">
-            {questionCount} questions posées
+            {questionCount}{" "}
+            {questionCount > 1 ? "questions posées" : "question posée"}
           </span>
         </div>
 

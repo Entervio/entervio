@@ -558,8 +558,8 @@ function JobDetail({
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 shrink-0">
-            <div className="flex gap-3">
+          <div className="flex flex-col gap-3 shrink-0 w-full md:w-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <TailorResumeDialog
                 jobDescription={job.description}
                 jobTitle={job.intitule}
