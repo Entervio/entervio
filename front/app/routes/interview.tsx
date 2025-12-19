@@ -135,7 +135,11 @@ export default function Interview() {
     .find((m) => m.role === "assistant");
 
   return (
+<<<<<<< Updated upstream
     <div className="min-h-screen w-full bg-background flex flex-col font-sans text-foreground relative">
+=======
+    <div className="min-h-screen w-full bg-background flex flex-col font-sans text-foreground overflow-hidden relative">
+>>>>>>> Stashed changes
       {/* Ambient Background */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-secondary/20 via-background to-background pointer-events-none" />
 
@@ -143,9 +147,18 @@ export default function Interview() {
       <header className="sticky top-0 left-0 right-0 z-50 p-6 flex justify-between items-center border-b border-border/50 bg-background/80 backdrop-blur-sm">
         <div className="flex items-center gap-2 bg-background/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-border/50 shadow-sm">
           <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+<<<<<<< Updated upstream
           <span className="text-sm text-muted-foreground">
             {questionCount}{" "}
             {questionCount > 1 ? "questions posées" : "question posée"}
+=======
+          <span className="text-sm font-medium text-foreground/80">
+            En direct
+          </span>
+          <span className="text-border mx-1">|</span>
+          <span className="text-sm text-muted-foreground">
+            {questionCount} questions posées
+>>>>>>> Stashed changes
           </span>
         </div>
 
@@ -160,7 +173,11 @@ export default function Interview() {
       </header>
 
       {/* Main Focus Area */}
+<<<<<<< Updated upstream
       <main className="flex-1 flex flex-col items-center justify-center relative z-10 px-6 max-w-4xl mx-auto w-full overflow-y-auto py-24">
+=======
+      <main className="flex-1 flex flex-col items-center justify-center relative z-10 px-6 max-w-4xl mx-auto w-full">
+>>>>>>> Stashed changes
         {/* Avatar / Visualizer */}
         <div className="mb-12 relative">
           <div
@@ -336,3 +353,7 @@ export default function Interview() {
     </div>
   );
 }
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
