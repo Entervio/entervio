@@ -1,6 +1,6 @@
-from google.auth import default
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from supabase import Client, create_client
 
 
 class Settings(BaseSettings):
@@ -60,6 +60,13 @@ class Settings(BaseSettings):
 
     # WebSocket
     WS_HEARTBEAT_INTERVAL: int = Field(default=30)
+
+    @property
+    def supabase_admin(self) -> Client:
+        """Return a Supabase client with service role privileges for admin operations."""
+        if not self.SUPABASE_URL or not self.SUPABASE_SERVICE_ROLE_KEY:
+            raise ValueError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set")
+        return create_client(self.SUPABASE_URL, self.SUPABASE_SERVICE_ROLE_KEY)
 
     model_config = SettingsConfigDict(
         env_file=".env", case_sensitive=True, extra="ignore"

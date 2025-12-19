@@ -45,7 +45,7 @@ async def get_current_user(
     user record if needed.
     """
     if credentials.scheme.lower() != "bearer":
-        logger.error("shit breaks here my guy")
+        logger.error("Invalid authentication scheme")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication scheme",
@@ -75,48 +75,20 @@ def get_current_db_user(
 
     user = db.query(User).filter(User.supabase_id == supabase_id).first()
 
-    # Get email verification status from the correct place in the Supabase token
-    email_verified = current_user.get("user_metadata", {}).get("email_verified", False)
+    # Check email verification status from Supabase token
+    # Supabase stores this in email_confirmed_at field
+    email_confirmed_at = current_user.get("email_confirmed_at")
+    email_verified = email_confirmed_at is not None
 
-    if not user:
-        # Lazy creation
-        logger.info(f"User {supabase_id} not found in local DB. Creating...")
-
-        # Extract metadata if available, otherwise use defaults
-        user_metadata = current_user.get("user_metadata", {})
-        email = current_user.get("email")
-
-        if not email:
-            # Should not happen with valid JWTs usually
-            raise HTTPException(status_code=400, detail="Email missing in token")
-
-        new_user = User(
-            supabase_id=supabase_id,
-            email=email,
-            first_name=user_metadata.get("first_name", email.split("@")[0]),
-            last_name=user_metadata.get("last_name", ""),
-            phone=user_metadata.get("phone"),
-            is_verified=email_verified,
-        )
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
-        user = new_user
-
-    # Sync email verification status from Supabase if it's not already set
+    # Sync email verification status from Supabase if it changed
     if not user.is_verified and email_verified:
         logger.info(f"User {user.id} confirmed their email. Updating local record.")
         user.is_verified = True
         db.commit()
         db.refresh(user)
 
-    # Forbid access to unverified users
-    if not user.is_verified:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Email not verified. Please check your inbox for a confirmation link.",
-        )
-
+    # Allow all users to access the API regardless of verification status
+    # The verification status is tracked but doesn't block access
     return user
 
 

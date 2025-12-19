@@ -1,4 +1,3 @@
-import httpx
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
 
@@ -22,10 +21,10 @@ class SignupRequest(BaseModel):
 class SignupResponse(BaseModel):
     id: int
     email: EmailStr
-    id: int
-    email: EmailStr
     first_name: str
     last_name: str
+    access_token: str
+    refresh_token: str
 
 
 @router.post(
@@ -33,82 +32,79 @@ class SignupResponse(BaseModel):
 )
 async def signup(payload: SignupRequest, db: DbSession):
     """Create a new user account."""
-    # Create user in Supabase Auth using the service role key
-    if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_ROLE_KEY:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Supabase configuration is not set",
+    try:
+        # Create user in Supabase Auth
+        supabase = settings.supabase_admin
+        auth_response = supabase.auth.admin.create_user(
+            {
+                "email": payload.email,
+                "password": payload.password,
+                "email_confirm": True,
+                "user_metadata": {
+                    "display_name": f"{payload.first_name} {payload.last_name}",
+                    "phone": payload.phone,
+                },
+            }
         )
 
-    supabase_auth_url = f"{settings.SUPABASE_URL}/auth/v1/signup"
-
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        try:
-            resp = await client.post(
-                supabase_auth_url,
-                headers={
-                    "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}",
-                    "apikey": settings.SUPABASE_SERVICE_ROLE_KEY,
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "email": payload.email,
-                    "password": payload.password,
-                    "user_metadata": {
-                        "first_name": payload.first_name,
-                        "last_name": payload.last_name,
-                        "phone": payload.phone,
-                    },
-                },
-            )
-        except httpx.HTTPError as e:
+        supabase_user = auth_response.user
+        if not supabase_user or not supabase_user.id:
             raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Failed to communicate with Supabase: {e}",
-            ) from e
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Supabase user ID missing in response",
+            )
 
-    if resp.status_code not in (200, 201):
-        try:
-            error_body = resp.json()
-        except Exception:
-            error_body = {"message": resp.text}
+        # Check if user already exists in local DB
+        existing = db.query(User).filter(User.email == payload.email).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A user with this email already exists",
+            )
 
-        status_code = status.HTTP_400_BAD_REQUEST
-        raise HTTPException(status_code=status_code, detail=error_body)
+        # Create local user record
+        user = User(
+            first_name=payload.first_name,
+            last_name=payload.last_name,
+            email=payload.email,
+            phone=payload.phone,
+            supabase_id=supabase_user.id,
+            is_verified=True,  # Auto-verify since we set email_confirm=True
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
 
-    supabase_user = resp.json()
-    supabase_user_id = supabase_user.get("id")
+        # Sign in the user to get tokens
+        sign_in_response = supabase.auth.sign_in_with_password(
+            {
+                "email": payload.email,
+                "password": payload.password,
+            }
+        )
 
-    if not supabase_user_id:
+        if not sign_in_response.session:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create session",
+            )
+
+        return SignupResponse(
+            id=user.id,
+            email=user.email,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            access_token=sign_in_response.session.access_token,
+            refresh_token=sign_in_response.session.refresh_token,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Supabase user ID missing in response",
-        )
-
-    existing = db.query(User).filter(User.email == payload.email).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A user with this email already exists",
-        )
-
-    user = User(
-        first_name=payload.first_name,
-        last_name=payload.last_name,
-        email=payload.email,
-        phone=payload.phone,
-        supabase_id=supabase_user_id,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-
-    return SignupResponse(
-        id=user.id,
-        email=user.email,
-        first_name=user.first_name,
-        last_name=user.last_name,
-    )
+            detail=f"Failed to create user: {str(e)}",
+        ) from e
 
 
 @router.get("/me", response_model=UserDetailed)
@@ -126,7 +122,6 @@ async def update_me(payload: UserUpdate, user: CurrentUser, db: DbSession):
         user.last_name = payload.last_name
     if payload.phone is not None:
         user.phone = payload.phone
-
     db.commit()
     db.refresh(user)
     return user
