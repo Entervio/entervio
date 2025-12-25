@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
 import { Button } from "~/components/ui/button";
 import {
   Building2,
@@ -11,8 +12,10 @@ import {
   Download,
   Mail,
   ArrowLeft,
+  Mic,
 } from "lucide-react";
 import { jobsService, type JobOffer } from "~/services/jobs";
+import { useSetupStore } from "~/services/usesetupstore";
 import { cn } from "~/lib/utils";
 
 function formatSalary(salary: string): string {
@@ -65,6 +68,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "~/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "~/components/ui/alert-dialog";
 
 function TailorResumeDialog({
   jobDescription,
@@ -493,6 +507,8 @@ function JobDetail({
   job: JobOffer | null;
   onBack: () => void;
 }) {
+  const navigate = useNavigate();
+
   if (!job) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-center p-12 text-muted-foreground bg-white rounded-2xl border border-dashed border-gray-200">
@@ -575,6 +591,49 @@ function JobDetail({
                 jobDescription={job.description}
                 jobTitle={job.intitule}
               />
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="rounded-full h-12 px-6 border-indigo-200 bg-indigo-50/50 text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300 hover:text-indigo-800 transition-all md:col-span-2 shadow-sm"
+                  >
+                    <Mic className="w-4 h-4 mr-2" />
+                    Simuler un entretien
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="rounded-2xl border-none shadow-2xl">
+                  <AlertDialogHeader>
+                    <div className="mx-auto bg-indigo-50 w-12 h-12 rounded-full flex items-center justify-center mb-2">
+                      <Mic className="w-6 h-6 text-indigo-600" />
+                    </div>
+                    <AlertDialogTitle className="text-center font-serif text-2xl">
+                      Commencer une simulation ?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription className="text-center text-base">
+                      Vous allez être redirigé vers l'espace de configuration
+                      d'entretien. La description de ce poste sera
+                      automatiquement utilisée pour personnaliser la simulation.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter className="sm:justify-center gap-2 mt-4">
+                    <AlertDialogCancel className="rounded-full px-8 h-12 border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors mt-0">
+                      Annuler
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => {
+                        useSetupStore
+                          .getState()
+                          .setJobDescription(job.description);
+                        navigate("/setup");
+                      }}
+                      className="rounded-full px-8 h-12 bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all hover:-translate-y-0.5"
+                    >
+                      Commencer
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
 
             {applyUrl && (
