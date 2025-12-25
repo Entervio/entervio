@@ -22,9 +22,10 @@ export function Navbar() {
         <div className="flex items-center gap-8">
           <Link
             to="/"
-            className="flex items-center gap-2 font-serif font-bold text-xl text-primary hover:opacity-80 transition-opacity"
+            className="flex items-center font-serif font-bold text-xl text-primary hover:opacity-80 transition-opacity"
             onClick={closeMobileMenu}
           >
+            <img src="/favicon.svg" alt="Entervio" className="w-16 h-16" />
             Entervio
           </Link>
 
