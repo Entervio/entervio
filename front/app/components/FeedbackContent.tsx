@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Loader2, AlertCircle, CheckCircle2, MessageSquare, Star, Quote, Lightbulb, TrendingUp, AlertTriangle, Target } from "lucide-react";
 import { cn } from "~/lib/utils";
+import { InterviewContext } from "~/components/InterviewContext";
 
 interface QuestionAnswer {
   question: string;
@@ -19,13 +20,19 @@ interface InterviewSummary {
   questions: QuestionAnswer[];
 }
 
+interface InterviewContextData {
+  job_description?: string;
+  interviewer_style?: string;
+}
+
 interface FeedbackContentProps {
   summary: InterviewSummary | null;
   loading: boolean;
   error: string | null;
+  interviewContext?: InterviewContextData | null;
 }
 
-export function FeedbackContent({ summary, loading, error }: FeedbackContentProps) {
+export function FeedbackContent({ summary, loading, error, interviewContext }: FeedbackContentProps) {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 animate-in fade-in duration-700">
@@ -79,6 +86,13 @@ export function FeedbackContent({ summary, loading, error }: FeedbackContentProp
           Voici une analyse détaillée de vos réponses pour vous aider à progresser.
         </p>
       </div>
+
+      {/* Interview Context Section */}
+      {interviewContext && (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '100ms' }}>
+          <InterviewContext data={interviewContext} collapsible={true} />
+        </div>
+      )}
 
       {/* Global Score & Summary */}
       <div className="grid md:grid-cols-3 gap-6">

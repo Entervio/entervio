@@ -20,6 +20,7 @@ import {
   Filter,
   ArrowRight,
   Clock,
+  Briefcase,
 } from "lucide-react";
 import { useInterviewListStore } from "~/services/interview-list-store";
 import { cn } from "~/lib/utils";
@@ -211,6 +212,16 @@ export default function InterviewsIndex() {
 
               <CardContent>
                 <div className="space-y-4">
+                  {/* Job Description Preview (if available) */}
+                  {interview.job_description && (
+                    <div className="flex items-start gap-2 p-2 bg-muted/30 rounded-lg">
+                      <Briefcase className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {interview.job_description}
+                      </p>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Calendar className="w-4 h-4" />
                     {formatDate(interview.created_at)}

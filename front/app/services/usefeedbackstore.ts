@@ -2,8 +2,14 @@ import { create } from "zustand";
 import { ApiError } from "~/lib/api";
 import { interviewApi, type InterviewSummary, type InterviewSummaryResponse } from "~/lib/interviewApi";
 
+interface InterviewContextData {
+  job_description?: string;
+  interviewer_style?: string;
+}
+
 interface FeedbackStore {
   summary: InterviewSummary | null;
+  interviewContext: InterviewContextData | null;
   loading: boolean;
   error: string | null;
   fetchSummary: (interviewId: string) => Promise<void>;
@@ -12,6 +18,7 @@ interface FeedbackStore {
 
 export const useFeedbackStore = create<FeedbackStore>((set) => ({
   summary: null,
+  interviewContext: null,
   loading: true,
   error: null,
 
@@ -26,6 +33,7 @@ export const useFeedbackStore = create<FeedbackStore>((set) => ({
     try {
       const data: InterviewSummaryResponse = await interviewApi.getInterviewSummary(interviewId);
       let finalSummary: InterviewSummary;
+      let context: InterviewContextData | null = null;
 
       console.log("data is ", data);
 
@@ -38,9 +46,16 @@ export const useFeedbackStore = create<FeedbackStore>((set) => ({
           overall_comment: "Feedback non disponible.",
           questions: []
         };
-        set({ summary: finalSummary, loading: false });
+        set({ summary: finalSummary, interviewContext: null, loading: false });
         return;
       }
+
+      // Extract interview context from the response
+      // Adjust these field names based on your actual API response structure
+      context = {
+        job_description: data.job_description,
+        interviewer_style: data.interviewer_style,
+      };
 
       // New structure: feedback is an object
       if (data.feedback) {
@@ -65,7 +80,7 @@ export const useFeedbackStore = create<FeedbackStore>((set) => ({
         };
       }
 
-      set({ summary: finalSummary, loading: false });
+      set({ summary: finalSummary, interviewContext: context, loading: false });
     } catch (err) {
       console.error("Error fetching summary:", err);
       if (err instanceof ApiError) {
@@ -87,6 +102,7 @@ export const useFeedbackStore = create<FeedbackStore>((set) => ({
   reset: () => {
     set({
       summary: null,
+      interviewContext: null,
       loading: true,
       error: null,
     });

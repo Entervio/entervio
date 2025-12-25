@@ -13,18 +13,22 @@ export function meta({ }: Route.MetaArgs) {
 
 export default function InterviewDetail() {
   const { interviewId } = useParams();
-  const { summary, loading, error, fetchSummary } = useFeedbackStore();
+  const { summary, interviewContext, loading, error, fetchSummary } = useFeedbackStore();
 
   useEffect(() => {
     if (interviewId) {
       fetchSummary(interviewId);
-      console.log(summary);
     }
   }, [interviewId, fetchSummary]);
 
   return (
     <div className="container mx-auto px-6 py-12 max-w-5xl">
-      <FeedbackContent summary={summary} loading={loading} error={error} />
+      <FeedbackContent 
+        summary={summary} 
+        loading={loading} 
+        error={error}
+        interviewContext={interviewContext}
+      />
     </div>
   );
 }

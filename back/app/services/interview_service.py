@@ -515,7 +515,12 @@ class InterviewService:
             }
 
         # Build the summary dictionary
-        summary = {"feedback": feedback_data, "questions": []}
+        summary = {
+            "feedback": feedback_data,
+            "job_description": interview.job_description,
+            "interviewer_style": interview.interviewer_style,
+            "questions": [],
+        }
 
         # Loop over question_answers and append each Q&A with feedback
         for qa in interview.question_answers:

@@ -17,13 +17,11 @@ export const useInterviewListStore = create<InterviewListStore>((set) => ({
 
   fetchInterviews: async () => {
     set({ loading: true, error: null });
-
     try {
       const data = await interviewApi.getInterviews();
       set({ interviews: data, loading: false });
     } catch (err) {
       console.error("Failed to fetch interviews:", err);
-
       if (err instanceof ApiError) {
         set({
           error:
