@@ -839,12 +839,12 @@ export default function JobsSearch() {
             <div className="flex-1 max-w-2xl">
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Search className="h-5 w-5 text-gray-400 group-focus-within:text-primary transition-colors" />
+                  <Sparkles className="h-5 w-5 text-indigo-500 group-focus-within:text-indigo-600 transition-colors animate-pulse" />
                 </div>
                 <input
                   type="text"
                   className="block w-full pl-11 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 focus:bg-white transition-all shadow-sm"
-                  placeholder="Décrivez votre job idéal ou laissez vide pour utiliser votre profil..."
+                  placeholder="Décrivez votre job idéal avec vos propres mots..."
                   value={nlQuery}
                   onChange={(e) => setNlQuery(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSmartSearch()}
