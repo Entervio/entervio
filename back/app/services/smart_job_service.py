@@ -1,9 +1,10 @@
 import logging
 from typing import Any
 
-from app.mcp.server import search_jobs
 from app.models.user import User
-from app.services.llm_service import llm_service
+from app.services.dspy_job_service import dspy_job_service
+from app.services.francetravail_service import francetravail_service
+from app.services.location_service import location_service
 from app.services.ranking_service import ranking_service
 
 logger = logging.getLogger(__name__)
@@ -36,61 +37,114 @@ class SmartJobService:
 
         return "\n".join(parts) if parts else "No profile data available."
 
+    async def _resolve_location(self, raw: str, type_hint: str) -> dict[str, str]:
+        """
+        Resolves a raw location string to an API parameter dict.
+        Returns e.g. {'region': '76'} or {'departement': '33'} or {'location': '69123'}.
+        """
+        # 1. Try Region
+        if type_hint == "region" or type_hint == "unknown":
+            regions = await location_service.search_regions(raw)
+            if regions:
+                logger.info(
+                    f"📍 Resolved '{raw}' to Region: {regions[0]['nom']} ({regions[0]['code']})"
+                )
+                return {"region": regions[0]["code"]}
+
+        # 2. Try Department
+        if type_hint == "departement" or type_hint == "unknown":
+            depts = await location_service.search_departments(raw)
+            if depts:
+                logger.info(
+                    f"📍 Resolved '{raw}' to Department: {depts[0]['nom']} ({depts[0]['code']})"
+                )
+                return {"departement": depts[0]["code"]}
+
+        # 3. Try City (Commune)
+        if type_hint == "commune" or type_hint == "unknown":
+            cities = await location_service.search_cities(raw)
+            if cities:
+                logger.info(
+                    f"📍 Resolved '{raw}' to City: {cities[0]['nom']} ({cities[0]['code']})"
+                )
+                return {"location": cities[0]["code"]}
+
+        logger.warning(f"⚠️ Could not resolve location '{raw}' (Hint: {type_hint})")
+        return {}
+
     async def smart_search(
         self, user: User, query: str | None = None
     ) -> list[dict[str, Any]]:
         """
-        Performs a smart job search for the user.
-
-        1. Extracts keywords from user's relational resume data OR from manual query.
-        2. Searches France Travail API for each keyword in parallel.
-        3. Aggregates and deduplicates results.
-        4. Reranks results using LLM based on user profile.
+        Performs a smart job search using DSPy for reasoning + Deterministic Resolution.
         """
-        logger.info(f"🧠 Starting smart search for user {user.id}")
+        logger.info(f" Starting smart search for user {user.id}")
 
         # 1. Build context
         profile_summary = self._build_profile_summary(user)
+        user_query = query or "Find jobs matching my profile"
 
-        # 3. Use LLM with Tools
-        tools = [search_jobs.fn]
-
-        found_jobs = await llm_service.search_with_tools(
-            query or "Find jobs matching my profile", profile_summary, tools
-        )
-
-        if not found_jobs:
-            logger.warning("⚠️ No jobs found via MCP search.")
+        # 2. DSPy Reasoning (Extract Intent)
+        # Note: DSPy is synchronous usually, but we can run it in a thread if needed.
+        # For now, running directly is fine if latency < 2s.
+        try:
+            params = dspy_job_service.predict_params(user_query, profile_summary)
+        except Exception as e:
+            logger.error(f"❌ DSPy failed: {e}")
             return []
 
-        # 5. Rerank
-        reranked_jobs = await ranking_service.compute_similarity_ranking(
-            profile_summary, found_jobs, query=query
-        )
+        # 3. Resolve Location (Deterministic)
+        ft_location_params = {}
+        if params.location_raw:
+            ft_location_params = await self._resolve_location(
+                params.location_raw, params.location_type
+            )
 
-        # 6. Mark applied jobs
-        applied_job_ids = {app.job_id for app in user.applications}
-        for job in reranked_jobs:
-            job["is_applied"] = job.get("id") in applied_job_ids
+        # 4. Execute Search (API)
+        try:
+            found_jobs = await francetravail_service.search_jobs(
+                keywords=params.keywords,
+                experience=params.experience_level,
+                experience_exigence=params.experience_exigence,
+                contract_type=params.contract_type,
+                is_full_time=params.is_full_time,
+                **ft_location_params,
+            )
 
-        return reranked_jobs
+            logger.info(f"✅ Found {len(found_jobs)} jobs via DSPy flow.")
 
-    def _get_search_keywords(self, user: User) -> list[str]:
-        """Extracts top keywords from user's relational data."""
-        keywords = []
+            if not found_jobs:
+                logger.warning("⚠️ No jobs found.")
+                return []
 
-        # Use top technical skills
-        tech_skills = [s.name for s in user.skills_list if s.category == "technical"]
-        if tech_skills:
-            keywords.extend(tech_skills[:3])
+            # 5. Rerank
+            reranked_jobs = await ranking_service.compute_similarity_ranking(
+                profile_summary, found_jobs, query=query
+            )
 
-        # Fallback: Use last job title
-        if not keywords and user.work_experiences:
-            last_role = user.work_experiences[0].role
-            if last_role:
-                keywords.append(last_role)
+            # 6. Mark applied jobs
+            applied_job_ids = {app.job_id for app in user.applications}
+            for job in reranked_jobs:
+                job["is_applied"] = job.get("id") in applied_job_ids
 
-        return keywords
+            return reranked_jobs
+
+        except Exception as e:
+            logger.error(f"❌ Error in API execution: {e}")
+            return []
 
 
-smart_job_service = SmartJobService()
+# Singleton instance
+_smart_job_instance = None
+
+
+def get_smart_job_service() -> SmartJobService:
+    global _smart_job_instance
+    if _smart_job_instance is None:
+        logger.info("🚀 Creating job_service singleton...")
+        _smart_job_instance = SmartJobService()
+        logger.info("✅ resume_service singleton created!")
+    return _smart_job_instance
+
+
+smart_job_service = get_smart_job_service()

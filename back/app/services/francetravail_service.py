@@ -57,7 +57,7 @@ class FranceTravailService:
             params["tempsPlein"] = kwargs["is_full_time"]
 
         if kwargs.get("sort_by") == "date":
-            params["sort"] = 1
+            params["sort"] = "1"
 
         # Experience level: 0 (not specified), 1 (<1 year), 2 (1-3 years), 3 (>3 years)
         if kwargs.get("experience"):
