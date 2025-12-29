@@ -37,10 +37,11 @@ class SmartJobService:
 
         return "\n".join(parts) if parts else "No profile data available."
 
-    async def _resolve_location(self, raw: str, type_hint: str) -> dict[str, str]:
+    async def _resolve_location(
+        self, raw: str, type_hint: str
+    ) -> tuple[dict[str, str], dict[str, Any]]:
         """
-        Resolves a raw location string to an API parameter dict.
-        Returns e.g. {'region': '76'} or {'departement': '33'} or {'location': '69123'}.
+        Resolves a raw location string to (API params, metadata).
         """
         # 1. Try Region
         if type_hint == "region" or type_hint == "unknown":
@@ -49,7 +50,7 @@ class SmartJobService:
                 logger.info(
                     f"📍 Resolved '{raw}' to Region: {regions[0]['nom']} ({regions[0]['code']})"
                 )
-                return {"region": regions[0]["code"]}
+                return {"region": regions[0]["code"]}, {}
 
         # 2. Try Department
         if type_hint == "departement" or type_hint == "unknown":
@@ -58,19 +59,26 @@ class SmartJobService:
                 logger.info(
                     f"📍 Resolved '{raw}' to Department: {depts[0]['nom']} ({depts[0]['code']})"
                 )
-                return {"departement": depts[0]["code"]}
+                return {"departement": depts[0]["code"]}, {}
 
         # 3. Try City (Commune)
         if type_hint == "commune" or type_hint == "unknown":
             cities = await location_service.search_cities(raw)
             if cities:
+                city = cities[0]
                 logger.info(
-                    f"📍 Resolved '{raw}' to City: {cities[0]['nom']} ({cities[0]['code']})"
+                    f"📍 Resolved '{raw}' to City: {city['nom']} ({city['code']})"
                 )
-                return {"location": cities[0]["code"]}
+
+                # Extract department for fallback
+                meta = {}
+                if "departement" in city and "code" in city["departement"]:
+                    meta["dept"] = city["departement"]["code"]
+
+                return {"location": city["code"]}, meta
 
         logger.warning(f"⚠️ Could not resolve location '{raw}' (Hint: {type_hint})")
-        return {}
+        return {}, {}
 
     async def smart_search(
         self, user: User, query: str | None = None
@@ -78,15 +86,13 @@ class SmartJobService:
         """
         Performs a smart job search using DSPy for reasoning + Deterministic Resolution.
         """
-        logger.info(f" Starting smart search for user {user.id}")
+        logger.info(f"🧠 Starting smart search for user {user.id}")
 
         # 1. Build context
         profile_summary = self._build_profile_summary(user)
         user_query = query or "Find jobs matching my profile"
 
         # 2. DSPy Reasoning (Extract Intent)
-        # Note: DSPy is synchronous usually, but we can run it in a thread if needed.
-        # For now, running directly is fine if latency < 2s.
         try:
             params = dspy_job_service.predict_params(user_query, profile_summary)
         except Exception as e:
@@ -95,12 +101,15 @@ class SmartJobService:
 
         # 3. Resolve Location (Deterministic)
         ft_location_params = {}
+        location_meta = {}
+
         if params.location_raw:
-            ft_location_params = await self._resolve_location(
+            ft_location_params, location_meta = await self._resolve_location(
                 params.location_raw, params.location_type
             )
 
         # 4. Execute Search (API)
+        found_jobs = []
         try:
             found_jobs = await francetravail_service.search_jobs(
                 keywords=params.keywords,
@@ -110,28 +119,69 @@ class SmartJobService:
                 is_full_time=params.is_full_time,
                 **ft_location_params,
             )
-
             logger.info(f"✅ Found {len(found_jobs)} jobs via DSPy flow.")
 
-            if not found_jobs:
-                logger.warning("⚠️ No jobs found.")
-                return []
-
-            # 5. Rerank
-            reranked_jobs = await ranking_service.compute_similarity_ranking(
-                profile_summary, found_jobs, query=query
-            )
-
-            # 6. Mark applied jobs
-            applied_job_ids = {app.job_id for app in user.applications}
-            for job in reranked_jobs:
-                job["is_applied"] = job.get("id") in applied_job_ids
-
-            return reranked_jobs
-
         except Exception as e:
-            logger.error(f"❌ Error in API execution: {e}")
+            logger.warning(f"⚠️ Primary search failed: {e}")
+            found_jobs = []
+
+        # 5. Fallback / Retry Logic (Cascade)
+        if not found_jobs and ft_location_params:
+            # A. Try Department Fallback
+            if "dept" in location_meta:
+                logger.info(
+                    f"🔄 Retrying with Parent Department ({location_meta['dept']})..."
+                )
+                try:
+                    found_jobs = await francetravail_service.search_jobs(
+                        keywords=params.keywords,
+                        experience=params.experience_level,
+                        experience_exigence=params.experience_exigence,
+                        contract_type=params.contract_type,
+                        is_full_time=params.is_full_time,
+                        departement=location_meta["dept"],
+                    )
+                    logger.info(
+                        f"✅ Found {len(found_jobs)} jobs via Department fallback."
+                    )
+                except Exception as e:
+                    logger.warning(f"⚠️ Department retry failed: {e}")
+
+            # B. Try National Fallback (if Dept failed or wasn't applicable)
+            if not found_jobs:
+                logger.info(
+                    "🔄 Retrying national search (removing location constraints)..."
+                )
+                try:
+                    found_jobs = await francetravail_service.search_jobs(
+                        keywords=params.keywords,
+                        experience=params.experience_level,
+                        experience_exigence=params.experience_exigence,
+                        contract_type=params.contract_type,
+                        is_full_time=params.is_full_time,
+                    )
+                    logger.info(
+                        f"✅ Found {len(found_jobs)} jobs via National fallback."
+                    )
+                except Exception as e:
+                    logger.error(f"❌ National fallback search also failed: {e}")
+                    return []
+
+        if not found_jobs:
+            logger.warning("⚠️ No jobs found.")
             return []
+
+        # 6. Rerank
+        reranked_jobs = await ranking_service.compute_similarity_ranking(
+            profile_summary, found_jobs, query=query
+        )
+
+        # 7. Mark applied jobs
+        applied_job_ids = {app.job_id for app in user.applications}
+        for job in reranked_jobs:
+            job["is_applied"] = job.get("id") in applied_job_ids
+
+        return reranked_jobs
 
 
 # Singleton instance

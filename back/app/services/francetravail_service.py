@@ -40,7 +40,13 @@ class FranceTravailService:
             return self.access_token
 
     async def search_jobs(
-        self, keywords: str, location: str | None = None, distance: int = 25, **kwargs
+        self,
+        keywords: str,
+        location: str | None = None,
+        departement: str | None = None,
+        region: str | None = None,
+        distance: int = 25,
+        **kwargs,
     ) -> list[dict]:
         token = await self._get_access_token()
 
@@ -57,7 +63,7 @@ class FranceTravailService:
             params["tempsPlein"] = kwargs["is_full_time"]
 
         if kwargs.get("sort_by") == "date":
-            params["sort"] = "1"
+            params["sort"] = 1
 
         # Experience level: 0 (not specified), 1 (<1 year), 2 (1-3 years), 3 (>3 years)
         if kwargs.get("experience"):
@@ -75,16 +81,18 @@ class FranceTravailService:
         if kwargs.get("published_since"):
             params["publieeDepuis"] = kwargs["published_since"]
 
-        if location:
-            # If location is a zip code or INSEE code (5 digits), use it directly
-            # Otherwise, we assume it's a code passed from SmartJobService
-            # The caller (SmartJobService) is responsible for resolving names to codes.
+        # Explicit Region/Department support
+        if region:
+            params["region"] = region
 
-            if location.isdigit() and len(location) == 2:
-                # If 2 digits, treat as department code (e.g. "33" for Gironde)
-                params["departement"] = location
-            elif location == "75056" or location.startswith("75"):
-                # Special case for Paris: use department 75 if it's Paris
+        if departement:
+            params["departement"] = departement
+
+        if location:
+            # 'location' argument now exclusively represents a City/Commune code
+            # (Region and Dept are passed via specific kwargs)
+            if location == "75056" or location == "75":
+                # Special handling for Paris: usually better to search by Dept 75 for full coverage
                 params["departement"] = "75"
             else:
                 params["commune"] = location
@@ -97,6 +105,8 @@ class FranceTravailService:
                 headers={"Authorization": f"Bearer {token}"},
                 params=params,
             )
+
+            logger.info(f"DEBUG: France Travail request: {params}")
 
             if response.status_code == 204:  # No content
                 return []
