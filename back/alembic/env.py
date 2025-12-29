@@ -9,6 +9,7 @@ from app.core.config import settings
 
 # Import your Base
 from app.db import Base
+from app.models.application import Application
 
 # ruff: noqa: F401
 from app.models.comment import FeedbackComment

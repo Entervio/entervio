@@ -1,12 +1,25 @@
 # app/api/v1/router.py
 from fastapi import APIRouter, Depends
 
-from app.api.v1.endpoints import auth, interviews, jobs, resume, voice_chat
+from app.api.v1.endpoints import (
+    applications,
+    auth,
+    interviews,
+    jobs,
+    resume,
+    voice_chat,
+)
 from app.core.auth import get_current_user
 
 api_router = APIRouter()
 
 protected_router = APIRouter(dependencies=[Depends(get_current_user)])
+
+protected_router.include_router(
+    applications.router,
+    prefix="/applications",
+    tags=["applications"],
+)
 
 protected_router.include_router(
     interviews.router,
