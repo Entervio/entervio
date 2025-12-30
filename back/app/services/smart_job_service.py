@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Any
 
@@ -92,84 +93,114 @@ class SmartJobService:
         profile_summary = self._build_profile_summary(user)
         user_query = query or "Find jobs matching my profile"
 
-        # 2. DSPy Reasoning (Extract Intent)
+        # 2. DSPy Reasoning (Extract Intent - Multiple Variations)
         try:
-            params = dspy_job_service.predict_params(user_query, profile_summary)
+            raw_variations = dspy_job_service.predict_params(
+                user_query, profile_summary
+            )
         except Exception as e:
             logger.error(f"❌ DSPy failed: {e}")
             return []
 
-        # 3. Resolve Location (Deterministic)
-        ft_location_params = {}
-        location_meta = {}
+        # Flatten variations (handle cases where DSPy returns nested lists)
+        variations = []
+        if isinstance(raw_variations, list):
+            for v in raw_variations:
+                if isinstance(v, list):
+                    variations.extend(v)
+                else:
+                    variations.append(v)
+        else:
+            variations = [raw_variations]
 
-        if params.location_raw:
-            ft_location_params, location_meta = await self._resolve_location(
-                params.location_raw, params.location_type
-            )
+        # 4. Prepare Parallel Search Tasks (Expansion Strategy)
+        tasks = []
 
-        # 4. Execute Search (API)
-        found_jobs = []
-        try:
-            found_jobs = await francetravail_service.search_jobs(
-                keywords=params.keywords,
-                experience=params.experience_level,
-                experience_exigence=params.experience_exigence,
-                contract_type=params.contract_type,
-                is_full_time=params.is_full_time,
-                **ft_location_params,
-            )
-            logger.info(f"✅ Found {len(found_jobs)} jobs via DSPy flow.")
+        for params in variations:
+            # 3. Resolve Location (Deterministic) for this variation
+            ft_location_params = {}
+            location_meta = {}
 
-        except Exception as e:
-            logger.warning(f"⚠️ Primary search failed: {e}")
-            found_jobs = []
+            # Safe attribute access
+            loc_raw = getattr(params, "location_raw", None)
+            loc_type = getattr(params, "location_type", "unknown")
 
-        # 5. Fallback / Retry Logic (Cascade)
-        if not found_jobs and ft_location_params:
-            # A. Try Department Fallback
-            if "dept" in location_meta:
-                logger.info(
-                    f"🔄 Retrying with Parent Department ({location_meta['dept']})..."
+            if loc_raw:
+                ft_location_params, location_meta = await self._resolve_location(
+                    loc_raw, loc_type
                 )
-                try:
-                    found_jobs = await francetravail_service.search_jobs(
-                        keywords=params.keywords,
-                        experience=params.experience_level,
-                        experience_exigence=params.experience_exigence,
-                        contract_type=params.contract_type,
-                        is_full_time=params.is_full_time,
+
+            # Task A: Primary Search (Strict Location)
+            tasks.append(
+                francetravail_service.search_jobs(
+                    keywords=getattr(params, "keywords", ""),
+                    experience=getattr(params, "experience_level", None),
+                    experience_exigence=getattr(params, "experience_exigence", None),
+                    contract_type=getattr(params, "contract_type", None),
+                    is_full_time=getattr(params, "is_full_time", None),
+                    **ft_location_params,
+                )
+            )
+
+            # Task B: Secondary Search (Department Scope)
+            if "dept" in location_meta and "departement" not in ft_location_params:
+                tasks.append(
+                    francetravail_service.search_jobs(
+                        keywords=getattr(params, "keywords", ""),
+                        experience=getattr(params, "experience_level", None),
+                        experience_exigence=getattr(
+                            params, "experience_exigence", None
+                        ),
+                        contract_type=getattr(params, "contract_type", None),
+                        is_full_time=getattr(params, "is_full_time", None),
                         departement=location_meta["dept"],
                     )
-                    logger.info(
-                        f"✅ Found {len(found_jobs)} jobs via Department fallback."
-                    )
-                except Exception as e:
-                    logger.warning(f"⚠️ Department retry failed: {e}")
-
-            # B. Try National Fallback (if Dept failed or wasn't applicable)
-            if not found_jobs:
-                logger.info(
-                    "🔄 Retrying national search (removing location constraints)..."
                 )
-                try:
-                    found_jobs = await francetravail_service.search_jobs(
-                        keywords=params.keywords,
-                        experience=params.experience_level,
-                        experience_exigence=params.experience_exigence,
-                        contract_type=params.contract_type,
-                        is_full_time=params.is_full_time,
-                    )
-                    logger.info(
-                        f"✅ Found {len(found_jobs)} jobs via National fallback."
-                    )
-                except Exception as e:
-                    logger.error(f"❌ National fallback search also failed: {e}")
-                    return []
 
-        if not found_jobs:
-            logger.warning("⚠️ No jobs found.")
-            return []
+        # 5. Execute Parallel
+        logger.info(
+            f"🚀 Executing {len(tasks)} search tasks in parallel (from {len(variations)} variations)..."
+        )
+        results_list = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 6. Merge & Deduplicate
+        all_jobs = []
+        seen_ids = set()
+
+        for i, res in enumerate(results_list):
+            if isinstance(res, list):  # Success
+                count = 0
+                for job in res:
+                    job_id = job.get("id")
+                    if job_id and job_id not in seen_ids:
+                        all_jobs.append(job)
+                        seen_ids.add(job_id)
+                        count += 1
+                logger.info(f"✅ Task {i} returned {len(res)} jobs ({count} new).")
+            else:
+                logger.warning(f"⚠️ Task {i} failed: {res}")
+
+        # 7. Fallback: National Search (if absolutely nothing found)
+        if not all_jobs:
+            logger.info("🔄 No jobs found in any scope. Retrying national search...")
+            try:
+                # Use the keywords from the first variation as fallback
+                fallback_keywords = (
+                    getattr(variations[0], "keywords", user_query)
+                    if variations
+                    else user_query
+                )
+
+                found_jobs = await francetravail_service.search_jobs(
+                    keywords=fallback_keywords
+                )
+                logger.info(f"✅ Found {len(found_jobs)} jobs via National fallback.")
+                all_jobs = found_jobs
+            except Exception as e:
+                logger.error(f"❌ National fallback search also failed: {e}")
+                return []
+
+        found_jobs = all_jobs
 
         # 6. Rerank
         reranked_jobs = await ranking_service.compute_similarity_ranking(
