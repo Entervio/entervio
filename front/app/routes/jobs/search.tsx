@@ -772,18 +772,7 @@ export default function JobsSearch() {
   const selectedJob = jobs.find((j) => j.id === selectedJobId) || null;
   const showDetail = selectedJobId !== null;
 
-  // 2. Scroll to top when clicking a job on mobile
-  const handleJobClick = (id: string) => {
-    setSelectedJobId(id);
-    if (window.innerWidth < 1024) {
-      // Mobile: allow default behavior or specific handling
-    }
-  };
-
   const handleSmartSearch = async () => {
-    // Allow empty query (uses profile)
-    // if (!nlQuery.trim()) return;
-
     setIsLoading(true);
     setJobs([]); // Clear previous results
     setSelectedJobId(null);
