@@ -772,6 +772,10 @@ export default function JobsSearch() {
   const selectedJob = jobs.find((j) => j.id === selectedJobId) || null;
   const showDetail = selectedJobId !== null;
 
+  const handleJobClick = (id: string) => {
+    setSelectedJobId(id);
+  };
+
   const handleSmartSearch = async () => {
     setIsLoading(true);
     setJobs([]); // Clear previous results
