@@ -454,13 +454,6 @@ function JobCard({
         </h3>
 
         <div className="flex items-center gap-2">
-          {/* Applied Badge */}
-          {job.is_applied && (
-            <span className="shrink-0 bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full border border-green-200">
-              Déjà postulé
-            </span>
-          )}
-
           {/* Match Score: Badge of Honor */}
           {job.relevance_score !== undefined && (
             <div
@@ -496,15 +489,20 @@ function JobCard({
 
       {/* Inline AI Insight */}
       {job.relevance_reasoning && (
-        <div className="flex items-start gap-2 text-sm text-gray-600 font-bold leading-relaxed">
+        <div className="flex items-start gap-2 text-sm text-gray-600 font-bold leading-relaxed mb-6">
           <Sparkles className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
           <p className="line-clamp-2">{job.relevance_reasoning}</p>
         </div>
       )}
 
-      {/* Arrow Action (Hidden by default, visible on hover/select) */}
-      <div className="absolute right-4 bottom-4 opacity-0 group-hover:opacity-100 transition-opacity">
-        <ArrowRight className="w-5 h-5 text-gray-400" />
+      {/* Arrow Action & Applied Badge (Bottom Right) */}
+      <div className="absolute right-4 bottom-4 flex items-center gap-2">
+        {job.is_applied && (
+          <span className="shrink-0 bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full border border-green-200">
+            Déjà postulé
+          </span>
+        )}
+        <ArrowRight className="w-5 h-5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
     </div>
   );
