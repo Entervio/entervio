@@ -27,6 +27,20 @@ export interface JobOffer {
   is_applied?: boolean;
 }
 
+export interface City {
+  nom: string;
+  code: string;
+  codesPostaux: string[];
+  departement?: {
+    code: string;
+    nom: string;
+  };
+  region?: {
+    code: string;
+    nom: string;
+  };
+}
+
 export const jobsService = {
   search: async (keywords: string, location?: string): Promise<JobOffer[]> => {
     const params = new URLSearchParams({ keywords });
@@ -69,63 +83,18 @@ export const jobsService = {
       .get("/auth/me")
       .then((r) => r.data)
       .catch(() => null);
+    
     if (!user) throw new Error("User not authenticated");
 
-    const token = window.localStorage.getItem("supabase.access_token");
-    const headers: HeadersInit = {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-
-    const response = await fetch("/api/v1/resume/tailor", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        user_id: user.id,
-        job_description: jobDescription,
-      }),
+    return api.postBlob("/resume/tailor", {
+      user_id: user.id,
+      job_description: jobDescription,
     });
-
-    if (!response.ok) {
-      throw new Error(`Failed to tailor resume: ${response.status}`);
-    }
-
-    return response.blob();
   },
 
   generateCoverLetter: async (jobDescription: string): Promise<Blob> => {
-    const token = window.localStorage.getItem("supabase.access_token");
-    const headers: HeadersInit = {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-
-    const response = await fetch("/api/v1/resume/cover-letter", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        job_description: jobDescription,
-      }),
+    return api.postBlob("/resume/cover-letter", {
+      job_description: jobDescription,
     });
-
-    if (!response.ok) {
-      throw new Error(`Failed to generate cover letter: ${response.status}`);
-    }
-
-    return response.blob();
   },
 };
-
-export interface City {
-  nom: string;
-  code: string;
-  codesPostaux: string[];
-  departement?: {
-    code: string;
-    nom: string;
-  };
-  region?: {
-    code: string;
-    nom: string;
-  };
-}
