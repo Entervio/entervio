@@ -68,6 +68,11 @@ class SmartJobService:
             profile_summary, found_jobs, query=query
         )
 
+        # 6. Mark applied jobs
+        applied_job_ids = {app.job_id for app in user.applications}
+        for job in reranked_jobs:
+            job["is_applied"] = job.get("id") in applied_job_ids
+
         return reranked_jobs
 
     def _get_search_keywords(self, user: User) -> list[str]:

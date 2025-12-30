@@ -1,7 +1,5 @@
 from datetime import datetime, timezone
 
-from fastapi.types import UnionType
-from pydantic.v1.fields import Undefined
 from sqlalchemy import Column, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -52,6 +50,9 @@ class User(Base):
     supabase_id = Column(Text, nullable=True, unique=True)
 
     interviews = relationship("Interview", back_populates="user")
+    applications = relationship(
+        "Application", back_populates="user", cascade="all, delete-orphan"
+    )
 
     @property
     def has_resume(self) -> bool:

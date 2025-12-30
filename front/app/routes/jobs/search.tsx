@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "~/components/ui/button";
 import {
@@ -13,6 +13,7 @@ import {
   Mail,
   ArrowLeft,
   Mic,
+  CheckCircle,
 } from "lucide-react";
 import { jobsService, type JobOffer } from "~/services/jobs";
 import { useSetupStore } from "~/services/usesetupstore";
@@ -452,17 +453,19 @@ function JobCard({
           {job.intitule}
         </h3>
 
-        {/* Match Score: Badge of Honor */}
-        {job.relevance_score !== undefined && (
-          <div
-            className={cn(
-              "shrink-0 font-bold text-sm flex items-center gap-1",
-              matchTextColor,
-            )}
-          >
-            {job.relevance_score}% Match
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Match Score: Badge of Honor */}
+          {job.relevance_score !== undefined && (
+            <div
+              className={cn(
+                "shrink-0 font-bold text-sm flex items-center gap-1",
+                matchTextColor,
+              )}
+            >
+              {job.relevance_score}% Match
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Naked Data: Company · Location · Salary */}
@@ -486,15 +489,20 @@ function JobCard({
 
       {/* Inline AI Insight */}
       {job.relevance_reasoning && (
-        <div className="flex items-start gap-2 text-sm text-gray-600 font-bold leading-relaxed">
+        <div className="flex items-start gap-2 text-sm text-gray-600 font-bold leading-relaxed mb-6">
           <Sparkles className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
           <p className="line-clamp-2">{job.relevance_reasoning}</p>
         </div>
       )}
 
-      {/* Arrow Action (Hidden by default, visible on hover/select) */}
-      <div className="absolute right-4 bottom-4 opacity-0 group-hover:opacity-100 transition-opacity">
-        <ArrowRight className="w-5 h-5 text-gray-400" />
+      {/* Arrow Action & Applied Badge (Bottom Right) */}
+      <div className="absolute right-4 bottom-4 flex items-center gap-2">
+        {job.is_applied && (
+          <span className="shrink-0 bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full border border-green-200">
+            Déjà postulé
+          </span>
+        )}
+        <ArrowRight className="w-5 h-5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
     </div>
   );
@@ -503,11 +511,21 @@ function JobCard({
 function JobDetail({
   job,
   onBack,
+  onApply,
 }: {
   job: JobOffer | null;
   onBack: () => void;
+  onApply: (jobId: string) => void;
 }) {
   const navigate = useNavigate();
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to top when job changes
+  useEffect(() => {
+    if (job?.id && scrollRef.current) {
+      scrollRef.current.scrollTo({ top: 0, behavior: "instant" });
+    }
+  }, [job?.id]);
 
   if (!job) {
     return (
@@ -532,14 +550,35 @@ function JobDetail({
     job.contact?.urlPostulation ||
     job.origineOffre?.urlOrigine;
 
+  const handlePostulerClick = async () => {
+    if (!applyUrl) return;
+
+    // 1. Open link immediately (best UX)
+    window.open(applyUrl, "_blank", "noopener,noreferrer");
+
+    // 2. Track in backend
+    try {
+      await jobsService.trackApplication(
+        job.id,
+        job.intitule,
+        job.entreprise?.nom,
+      );
+      // 3. Update local state
+      onApply(job.id);
+    } catch (error) {
+      console.error("Failed to track application:", error);
+    }
+  };
+
   return (
     <div
+      ref={scrollRef}
       className={cn(
         "bg-white border-gray-100 shadow-sm",
-        // DESKTOP: Keep the "Dashboard" feel
-        "lg:h-[calc(100vh-140px)] lg:sticky lg:top-4 lg:overflow-y-auto lg:rounded-2xl lg:border",
-        // MOBILE: Let it be a normal, fluid element
-        "h-auto w-full relative",
+        // DESKTOP: Fixed height container with internal scroll
+        "lg:h-full lg:overflow-y-auto lg:rounded-2xl lg:border",
+        // MOBILE: Let it be a normal, fluid element (handled by parent overflow if needed, but usually mobile is stacked)
+        "h-full overflow-y-auto w-full relative",
       )}
     >
       {" "}
@@ -569,6 +608,12 @@ function JobDetail({
         {/* Title & Actions */}
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
           <div>
+            {job.is_applied && (
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm font-medium mb-3">
+                <CheckCircle className="w-4 h-4" />
+                Vous avez postulé à cette offre
+              </div>
+            )}
             <h1 className="text-3xl md:text-4xl font-bold text-gray-900 leading-tight mb-2">
               {job.intitule}
             </h1>
@@ -638,14 +683,12 @@ function JobDetail({
 
             {applyUrl && (
               <Button
-                asChild
+                onClick={handlePostulerClick}
                 size="lg"
                 className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 px-8 h-12 text-base font-medium transition-transform hover:-translate-y-0.5"
               >
-                <a href={applyUrl} target="_blank" rel="noopener noreferrer">
-                  Postuler
-                  <ExternalLink className="w-4 h-4 ml-2" />
-                </a>
+                Postuler
+                <ExternalLink className="w-4 h-4 ml-2" />
               </Button>
             )}
           </div>
@@ -726,42 +769,10 @@ export default function JobsSearch() {
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
-  const [showHeader, setShowHeader] = useState(true);
-  const [lastScrollY, setLastScrollY] = useState(0);
-
   const selectedJob = jobs.find((j) => j.id === selectedJobId) || null;
   const showDetail = selectedJobId !== null;
 
-  // 1. Handle Header Hiding on Scroll
-  useEffect(() => {
-    const controlNavbar = () => {
-      if (typeof window !== "undefined") {
-        const currentScrollY = window.scrollY;
-        // Show if at top OR scrolling up
-        if (currentScrollY < 100) {
-          setShowHeader(true);
-        } else {
-          setShowHeader(currentScrollY < lastScrollY);
-        }
-        setLastScrollY(currentScrollY);
-      }
-    };
-    window.addEventListener("scroll", controlNavbar);
-    return () => window.removeEventListener("scroll", controlNavbar);
-  }, [lastScrollY]);
-
-  // 2. Scroll to top when clicking a job on mobile
-  const handleJobClick = (id: string) => {
-    setSelectedJobId(id);
-    if (window.innerWidth < 1024) {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  };
-
   const handleSmartSearch = async () => {
-    // Allow empty query (uses profile)
-    // if (!nlQuery.trim()) return;
-
     setIsLoading(true);
     setJobs([]); // Clear previous results
     setSelectedJobId(null);
@@ -782,6 +793,12 @@ export default function JobsSearch() {
     }
   };
 
+  const handleApply = (jobId: string) => {
+    setJobs((prev) =>
+      prev.map((j) => (j.id === jobId ? { ...j, is_applied: true } : j)),
+    );
+  };
+
   const quickChips = [
     "CDI Temps Plein",
     "Junior",
@@ -791,15 +808,9 @@ export default function JobsSearch() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] text-gray-900 font-sans flex flex-col">
+    <div className="h-screen bg-[#FAFAFA] text-gray-900 font-sans flex flex-col overflow-hidden">
       {/* Header & Search */}
-      <div
-        className={cn(
-          "bg-white border-b border-gray-200 sticky top-0 z-30 transition-transform duration-300 ease-in-out",
-          !showHeader && "-translate-y-full", // Hides header when scrolling down
-          { "hidden lg:block": showDetail },
-        )}
-      >
+      <div className="bg-white border-b border-gray-200 shrink-0 z-30">
         <div className="max-w-[1600px] mx-auto px-4 md:px-6 py-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
@@ -858,18 +869,13 @@ export default function JobsSearch() {
       </div>
 
       {/* Main Content: Split View */}
-      <div
-        className={cn(
-          "max-w-[1600px] mx-auto w-full flex-1",
-          !showDetail && "px-4 md:px-6 py-6",
-        )}
-      >
+      <div className="flex-1 min-h-0 w-full max-w-[1600px] mx-auto p-4 md:p-6">
         {jobs.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
             {/* Left Column: List (Scrollable) */}
             <div
               className={cn(
-                "lg:col-span-4 lg:h-full lg:overflow-y-auto custom-scrollbar pr-2 space-y-3 pb-20",
+                "lg:col-span-4 h-full overflow-y-auto custom-scrollbar pr-2 space-y-3 pb-20",
                 { "hidden lg:block": selectedJobId },
               )}
             >
@@ -888,9 +894,9 @@ export default function JobsSearch() {
               ))}
             </div>
 
-            {/* Right Column: Detail (Sticky) */}
+            {/* Right Column: Detail (Independent Scroll) */}
             <div
-              className={cn("lg:col-span-8 h-full", {
+              className={cn("lg:col-span-8 h-full overflow-hidden", {
                 block: showDetail,
                 "hidden lg:block": !showDetail,
               })}
@@ -898,6 +904,7 @@ export default function JobsSearch() {
               <JobDetail
                 job={selectedJob}
                 onBack={() => setSelectedJobId(null)}
+                onApply={handleApply}
               />
             </div>
           </div>
