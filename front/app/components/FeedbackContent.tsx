@@ -1,12 +1,32 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
-import { Loader2, AlertCircle, CheckCircle2, MessageSquare, Star, Quote, Lightbulb, TrendingUp, AlertTriangle, Target } from "lucide-react";
+import { Button } from "~/components/ui/button";
+import { 
+  Loader2, 
+  AlertCircle, 
+  CheckCircle2, 
+  MessageSquare, 
+  Star, 
+  Quote, 
+  Lightbulb, 
+  TrendingUp, 
+  AlertTriangle, 
+  Target,
+  Sparkles,
+  ChevronDown,
+  ChevronUp
+} from "lucide-react";
 import { cn } from "~/lib/utils";
 import { InterviewContext } from "~/components/InterviewContext";
+import { useFeedbackStore } from "~/services/usefeedbackstore";
+import { useParams } from "react-router";
 
 interface QuestionAnswer {
+  id: number;
   question: string;
   answer: string | null;
+  response_example: string | null;
   grade: number | null;
   feedback: string | null;
 }
@@ -32,7 +52,147 @@ interface FeedbackContentProps {
   interviewContext?: InterviewContextData | null;
 }
 
+function QuestionCard({ qa, index, interviewId }: { qa: QuestionAnswer; index: number; interviewId: string }) {
+  const [showExample, setShowExample] = useState(false);
+  const { generateExampleResponse, generatingExampleForQuestion } = useFeedbackStore();
+  
+  const isGenerating = generatingExampleForQuestion === qa.id;
+  const hasExample = !!qa.response_example;
+
+  const handleGenerateExample = async () => {
+    await generateExampleResponse(interviewId, qa.id);
+    // Auto-expand after successful generation
+    setShowExample(true);
+  };
+
+  return (
+    <Card
+      className="group overflow-hidden border-border hover:border-primary/30 transition-all duration-500 hover:shadow-(--shadow-diffuse) bg-card"
+    >
+      <CardHeader className="bg-muted/30 pb-6 border-b border-border/40">
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+          <div className="space-y-3 flex-1">
+            <Badge variant="outline" className="bg-background/50 backdrop-blur-sm font-medium text-muted-foreground border-border/60">
+              Question {index + 1}
+            </Badge>
+            <h3 className="text-xl font-medium text-foreground leading-snug font-serif">
+              {qa.question}
+            </h3>
+          </div>
+          {qa.grade !== null && (
+            <div className="flex items-center gap-2 bg-background px-4 py-2 rounded-full border border-border shadow-sm shrink-0 group-hover:scale-105 transition-transform duration-300">
+              <Star className={cn("h-5 w-5", qa.grade >= 8 ? "text-emerald-500 fill-emerald-500" : qa.grade >= 5 ? "text-amber-500 fill-amber-500" : "text-red-500 fill-red-500")} />
+              <span className="text-lg font-bold text-foreground">{qa.grade}</span>
+              <span className="text-sm text-muted-foreground font-medium">/10</span>
+            </div>
+          )}
+        </div>
+      </CardHeader>
+
+      <CardContent className="pt-8 space-y-8">
+        {/* User Answer */}
+        <div className="relative pl-6 border-l-2 border-primary/20">
+          <Quote className="absolute -left-3 -top-3 h-6 w-6 text-primary/20 bg-card p-1 rounded-full" />
+          <h4 className="text-xs font-bold text-primary/60 uppercase tracking-widest mb-3">
+            Votre réponse
+          </h4>
+          <p className="text-foreground/80 italic leading-relaxed">
+            {qa.answer ? `"${qa.answer}"` : <span className="text-muted-foreground">Pas de réponse fournie</span>}
+          </p>
+        </div>
+
+        {/* Example Response Section */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+              <Sparkles className="h-4 w-4" />
+              Réponse exemple IA
+            </h4>
+            
+            {!hasExample ? (
+              <Button
+                onClick={handleGenerateExample}
+                disabled={isGenerating}
+                size="sm"
+                variant="outline"
+                className="gap-2 hover:bg-secondary hover:border-secondary hover:text-secondary-foreground transition-colors"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Génération...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Générer un exemple
+                  </>
+                )}
+              </Button>
+            ) : (
+              <Button
+                onClick={() => setShowExample(!showExample)}
+                size="sm"
+                variant="ghost"
+                className="gap-2 text-muted-foreground hover:text-foreground"
+              >
+                {showExample ? (
+                  <>
+                    <ChevronUp className="h-4 w-4" />
+                    Masquer
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-4 w-4" />
+                    Voir l'exemple
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+
+          {/* Collapsible Example Content */}
+          {hasExample && showExample && (
+            <div className="bg-secondary/30 rounded-2xl p-6 border border-secondary/40 animate-in fade-in slide-in-from-top-4 duration-500">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-secondary rounded-lg shrink-0">
+                  <Sparkles className="h-4 w-4 text-secondary-foreground" />
+                </div>
+                <div className="flex-1 space-y-2">
+                  <p className="text-sm text-muted-foreground font-medium">
+                    Voici un exemple de réponse professionnelle adaptée à votre profil :
+                  </p>
+                  <p className="text-foreground/90 leading-relaxed italic">
+                    "{qa.response_example}"
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* AI Feedback */}
+        {qa.feedback && (
+          <div className="bg-secondary/10 rounded-2xl p-6 border border-secondary/20">
+            <div className="flex items-center gap-2 mb-3">
+              <Lightbulb className="h-5 w-5 text-secondary-foreground" />
+              <h4 className="text-sm font-bold text-secondary-foreground uppercase tracking-widest">
+                Analyse & Conseils
+              </h4>
+            </div>
+            <p className="text-foreground/90 leading-relaxed">
+              {qa.feedback}
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function FeedbackContent({ summary, loading, error, interviewContext }: FeedbackContentProps) {
+  const { interviewId } = useParams();
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 animate-in fade-in duration-700">
@@ -97,7 +257,7 @@ export function FeedbackContent({ summary, loading, error, interviewContext }: F
       {/* Global Score & Summary */}
       <div className="grid md:grid-cols-3 gap-6">
         {/* Score Card */}
-        <Card className="md:col-span-1 border-border shadow-[var(--shadow-diffuse)] bg-card overflow-hidden relative group flex flex-col items-center justify-center p-6">
+        <Card className="md:col-span-1 border-border shadow-(--shadow-diffuse) bg-card overflow-hidden relative group flex flex-col items-center justify-center p-6">
           <div className="absolute top-0 left-0 w-full h-1 bg-primary" />
           <div className="relative z-10 flex flex-col items-center">
             <div className="text-sm font-medium text-muted-foreground uppercase tracking-widest mb-2">Score Global</div>
@@ -116,7 +276,7 @@ export function FeedbackContent({ summary, loading, error, interviewContext }: F
         </Card>
 
         {/* Overall Comment */}
-        <Card className="md:col-span-2 border-border shadow-[var(--shadow-diffuse)] bg-card overflow-hidden relative group">
+        <Card className="md:col-span-2 border-border shadow-(--shadow-diffuse) bg-card overflow-hidden relative group">
           <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
           <CardHeader className="pb-2">
             <div className="flex items-center gap-3 mb-2">
@@ -218,58 +378,12 @@ export function FeedbackContent({ summary, loading, error, interviewContext }: F
 
         <div className="grid gap-8">
           {summary.questions.map((qa, index) => (
-            <Card
-              key={index}
-              className="group overflow-hidden border-border hover:border-primary/30 transition-all duration-500 hover:shadow-[var(--shadow-diffuse)] bg-card"
-            >
-              <CardHeader className="bg-muted/30 pb-6 border-b border-border/40">
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                  <div className="space-y-3 flex-1">
-                    <Badge variant="outline" className="bg-background/50 backdrop-blur-sm font-medium text-muted-foreground border-border/60">
-                      Question {index + 1}
-                    </Badge>
-                    <h3 className="text-xl font-medium text-foreground leading-snug font-serif">
-                      {qa.question}
-                    </h3>
-                  </div>
-                  {qa.grade !== null && (
-                    <div className="flex items-center gap-2 bg-background px-4 py-2 rounded-full border border-border shadow-sm shrink-0 group-hover:scale-105 transition-transform duration-300">
-                      <Star className={cn("h-5 w-5", qa.grade >= 8 ? "text-emerald-500 fill-emerald-500" : qa.grade >= 5 ? "text-amber-500 fill-amber-500" : "text-red-500 fill-red-500")} />
-                      <span className="text-lg font-bold text-foreground">{qa.grade}</span>
-                      <span className="text-sm text-muted-foreground font-medium">/10</span>
-                    </div>
-                  )}
-                </div>
-              </CardHeader>
-
-              <CardContent className="pt-8 space-y-8">
-                {/* User Answer */}
-                <div className="relative pl-6 border-l-2 border-primary/20">
-                  <Quote className="absolute -left-3 -top-3 h-6 w-6 text-primary/20 bg-card p-1 rounded-full" />
-                  <h4 className="text-xs font-bold text-primary/60 uppercase tracking-widest mb-3">
-                    Votre réponse
-                  </h4>
-                  <p className="text-foreground/80 italic leading-relaxed">
-                    {qa.answer ? `"${qa.answer}"` : <span className="text-muted-foreground">Pas de réponse fournie</span>}
-                  </p>
-                </div>
-
-                {/* AI Feedback */}
-                {qa.feedback && (
-                  <div className="bg-secondary/10 rounded-2xl p-6 border border-secondary/20">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Lightbulb className="h-5 w-5 text-emerald-600" />
-                      <h4 className="text-sm font-bold text-emerald-800 uppercase tracking-widest">
-                        Analyse & Conseils
-                      </h4>
-                    </div>
-                    <p className="text-foreground/90 leading-relaxed">
-                      {qa.feedback}
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <QuestionCard 
+              key={qa.id} 
+              qa={qa} 
+              index={index}
+              interviewId={interviewId!}
+            />
           ))}
         </div>
       </div>

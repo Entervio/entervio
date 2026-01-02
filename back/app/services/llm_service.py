@@ -97,7 +97,7 @@ def get_system_prompt(
 class LLMService:
     def __init__(self):
         """Initialize with Groq using settings from config."""
-        logger.info("🔄 Initializing LLMService...")
+        logger.info("Initializing LLMService...")
 
         # Get API keys
         groq_api_key = settings.GROQ_API_KEY
@@ -107,11 +107,11 @@ class LLMService:
         if groq_api_key:
             try:
                 self.groq_client = Groq(api_key=groq_api_key)
-                logger.info("✅ Groq client initialized successfully!")
+                logger.info("Groq client initialized successfully!")
             except Exception as e:
-                logger.error(f"❌ Failed to initialize Groq client: {str(e)}")
+                logger.error(f"Failed to initialize Groq client: {str(e)}")
         else:
-            logger.warning("⚠️ GROQ_API_KEY not configured. LLM features will not work.")
+            logger.warning("GROQ_API_KEY not configured. LLM features will not work.")
 
     def get_initial_greeting(
         self,
@@ -133,7 +133,7 @@ class LLMService:
             Personalized greeting message
         """
         logger.info(
-            f"👋 Generating greeting for {candidate_name} with {interviewer_type} interviewer"
+            f"Generating greeting for {candidate_name} with {interviewer_type} interviewer"
         )
 
         return prompt_manager.format_prompt(
@@ -153,7 +153,7 @@ class LLMService:
         Send message to Groq and get interviewer response.
         """
         logger.info(
-            f"💬 Processing candidate response with {interviewer_type} interviewer"
+            f"Processing candidate response with {interviewer_type} interviewer"
         )
 
         if not self.groq_client:
@@ -192,12 +192,12 @@ class LLMService:
             response_text = completion.choices[0].message.content
 
             logger.info(
-                f"✅ Got {interviewer_type} interviewer response ({len(response_text)} chars)"
+                f"Got {interviewer_type} interviewer response ({len(response_text)} chars)"
             )
             return response_text
 
         except Exception as e:
-            logger.error(f"❌ Chat error: {str(e)}")
+            logger.error(f"Chat error: {str(e)}")
             raise
 
     async def grade_response(
@@ -206,7 +206,7 @@ class LLMService:
         """
         Grade a candidate's response to an interview question.
         """
-        logger.info(f"📊 Grading response with {interviewer_type} interviewer...")
+        logger.info(f"Grading response with {interviewer_type} interviewer...")
 
         if not self.groq_client:
             return {"grade": 5, "feedback": "Service non disponible"}
@@ -235,11 +235,11 @@ class LLMService:
             )
 
             result = json.loads(completion.choices[0].message.content)
-            logger.info(f"✅ Response graded: {result.get('grade')}/10")
+            logger.info(f"Response graded: {result.get('grade')}/10")
             return result
 
         except Exception as e:
-            logger.error(f"❌ Grading error: {str(e)}")
+            logger.error(f"Grading error: {str(e)}")
             return {"grade": 5, "feedback": "Erreur lors de l'évaluation."}
 
     async def end_interview(
@@ -251,7 +251,7 @@ class LLMService:
         Generate structured feedback using Groq.
         """
         logger.info(
-            f"📝 Generating structured interview feedback with {interviewer_type} interviewer..."
+            f"Generating structured interview feedback with {interviewer_type} interviewer..."
         )
 
         if not self.groq_client:
@@ -280,11 +280,11 @@ class LLMService:
             )
 
             feedback_data = json.loads(completion.choices[0].message.content)
-            logger.info("✅ Structured interview feedback generated")
+            logger.info("Structured interview feedback generated")
             return feedback_data
 
         except Exception as e:
-            logger.error(f"❌ Error generating feedback: {str(e)}")
+            logger.error(f"Error generating feedback: {str(e)}")
             return {
                 "score": 5,
                 "strengths": ["Participation"],
@@ -293,13 +293,64 @@ class LLMService:
                 "overall_comment": "Erreur technique.",
             }
 
+    async def generate_example_response(
+        self,
+        question: str,
+        candidate_context: str = "",
+        job_description: str = "",
+    ) -> str:
+        """
+        Generate an example response for an interview question.
+
+        Args:
+            question: The interview question
+            candidate_context: Context from resume
+            job_description: Job description context
+
+        Returns:
+            Example response text
+        """
+        logger.info(f"Generating example response for question: {question[:50]}...")
+
+        if not self.groq_client:
+            raise ValueError("Groq client not initialized")
+
+        try:
+            prompt = prompt_manager.format_prompt(
+                "interview.example_response",
+                question=question,
+                candidate_context=candidate_context or "Aucun contexte disponible",
+                job_description=job_description or "Non spécifié",
+            )
+
+            completion = self.groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Tu es un expert en entretien d'embauche qui génère des réponses exemple professionnelles.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.7,
+                max_tokens=512,
+            )
+
+            example_response = completion.choices[0].message.content.strip()
+            logger.info(f"Generated example response ({len(example_response)} chars)")
+            return example_response
+
+        except Exception as e:
+            logger.error(f"Error generating example response: {str(e)}")
+            raise
+
     async def search_with_tools(
         self, user_query: str, user_context: str, tools: list[Any]
     ) -> list[dict]:
         """
         Perform a search using Groq tool calling (OpenAI compatible).
         """
-        logger.info(f"🛠️ Starting search with tools (Groq) for query: '{user_query}'")
+        logger.info(f"Starting search with tools (Groq) for query: '{user_query}'")
 
         try:
             if not self.groq_client:
@@ -398,7 +449,7 @@ class LLMService:
                 {"role": "user", "content": user_query},
             ]
 
-            logger.info(f"🤖 Groq decided to call {messages}")
+            logger.info(f"Groq decided to call {messages}")
 
             response = self.groq_client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
@@ -415,7 +466,7 @@ class LLMService:
             all_found_jobs = []
 
             if tool_calls:
-                logger.info(f"🤖 Groq decided to call {len(tool_calls)} tools")
+                logger.info(f"Groq decided to call {len(tool_calls)} tools")
 
                 # Execute tool calls
                 for tool_call in tool_calls:
@@ -425,32 +476,32 @@ class LLMService:
                             raw_args = json.loads(tool_call.function.arguments)
                             validated_args = SearchJobsArgs.model_validate(raw_args)
                             logger.info(
-                                f"📞 Calling search_jobs with validated args: {validated_args.model_dump(exclude_none=True)}"
+                                f"Calling search_jobs with validated args: {validated_args.model_dump(exclude_none=True)}"
                             )
                         except json.JSONDecodeError as e:
                             logger.error(
-                                f"❌ Failed to parse tool call arguments as JSON: {e}"
+                                f"Failed to parse tool call arguments as JSON: {e}"
                             )
                             continue
                         except Exception as e:
                             logger.error(
-                                f"❌ Pydantic validation failed for search_jobs args: {e}"
+                                f"Pydantic validation failed for search_jobs args: {e}"
                             )
                             continue
                         try:
                             raw_args = json.loads(tool_call.function.arguments)
                             validated_args = SearchJobsArgs.model_validate(raw_args)
                             logger.info(
-                                f"📞 Calling search_jobs with validated args: {validated_args.model_dump(exclude_none=True)}"
+                                f"Calling search_jobs with validated args: {validated_args.model_dump(exclude_none=True)}"
                             )
                         except json.JSONDecodeError as e:
                             logger.error(
-                                f"❌ Failed to parse tool call arguments as JSON: {e}"
+                                f"Failed to parse tool call arguments as JSON: {e}"
                             )
                             continue
                         except Exception as e:
                             logger.error(
-                                f"❌ Pydantic validation failed for search_jobs args: {e}"
+                                f"Pydantic validation failed for search_jobs args: {e}"
                             )
                             continue
 
@@ -475,7 +526,7 @@ class LLMService:
                                 all_found_jobs.extend(jobs)
                         except Exception as e:
                             logger.error(
-                                f"❌ Failed to parse jobs JSON from tool: {e}. Content: {jobs_json[:200]}..."
+                                f"Failed to parse jobs JSON from tool: {e}. Content: {jobs_json[:200]}..."
                             )
             unique_jobs = list(
                 {job["id"]: job for job in all_found_jobs if job.get("id")}.values()
@@ -484,17 +535,13 @@ class LLMService:
                 {job["id"]: job for job in all_found_jobs if job.get("id")}.values()
             )
 
-            logger.info(
-                f"✅ Extracted {len(unique_jobs)} unique jobs from tool execution"
-            )
+            logger.info(f"Extracted {len(unique_jobs)} unique jobs from tool execution")
             return unique_jobs
-            logger.info(
-                f"✅ Extracted {len(unique_jobs)} unique jobs from tool execution"
-            )
+            logger.info(f"Extracted {len(unique_jobs)} unique jobs from tool execution")
             return unique_jobs
 
         except Exception as e:
-            logger.error(f"❌ Error in search_with_tools (Groq): {str(e)}")
+            logger.error(f"Error in search_with_tools (Groq): {str(e)}")
             return []
 
 
@@ -506,9 +553,9 @@ def get_llm_service() -> LLMService:
     """Get or create the LLM service singleton."""
     global _llm_service_instance
     if _llm_service_instance is None:
-        logger.info("🚀 Creating llm_service singleton...")
+        logger.info("Creating llm_service singleton...")
         _llm_service_instance = LLMService()
-        logger.info("✅ llm_service singleton created!")
+        logger.info("llm_service singleton created!")
     return _llm_service_instance
 
 

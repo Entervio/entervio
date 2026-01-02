@@ -1,3 +1,4 @@
+import type { InterviewerType } from "~/types/interview";
 import { API_BASE_URL } from "./api";
 import { ApiError, withAuthHeaders } from "./api";
 
@@ -10,14 +11,18 @@ export interface FeedbackData {
 }
 
 export interface QuestionAnswer {
+  id: number;
   question: string;
   answer: string | null;
+  response_example: string | null;
   grade: number | null;
   feedback: string | null;
 }
 
 export interface InterviewSummaryResponse {
   feedback: FeedbackData | null;
+  job_description: string;
+  interviewer_style: InterviewerType
   questions: QuestionAnswer[];
 }
 
@@ -84,6 +89,7 @@ export interface Interview {
   interviewer_style: string;
   question_count: number;
   grade: number;
+  job_description?: string;
 }
 
 export interface InterviewSummary {
@@ -312,5 +318,32 @@ export const interviewApi = {
     }
     return response.json();
   },
-};
 
+  /**
+   * Generate an example response for a specific question in an interview
+   */
+  async generateExampleResponse(
+    interviewId: string,
+    questionId: number
+  ): Promise<QuestionAnswer> {
+    const response = await fetch(
+      `${API_BASE_URL}/interviews/${interviewId}/questions/${questionId}/example`,
+      withAuthHeaders({
+        method: "POST",
+      }),
+    );
+
+    if (!response.ok) {
+      throw new ApiError(
+        response.status,
+        response.status === 404
+          ? "Question non trouvée"
+          : response.status === 403
+          ? "Non autorisé"
+          : `Erreur lors de la génération: ${response.status}`
+      );
+    }
+
+    return response.json();
+  },
+};

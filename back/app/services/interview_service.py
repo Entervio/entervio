@@ -74,7 +74,7 @@ class InterviewService:
                 candidate_context = f"User has {len(user.work_experiences)} jobs and {len(user.projects)} projects."
 
             if candidate_context != "":
-                logger.info(f"📄 Added resume context for candidate {user.id}")
+                logger.info(f"Added resume context for candidate {user.id}")
 
             # Get personalized greeting from LLM
             greeting_text = self.llm_service.get_initial_greeting(
@@ -144,14 +144,14 @@ class InterviewService:
                     detail="Not authorized to access this interview",
                 )
 
-            logger.info(f"🎤 Processing audio for interview {interview_id}")
+            logger.info(f"Processing audio for interview {interview_id}")
 
             # Step 1: Transcribe audio using voice service
-            logger.info("🔄 Transcribing audio...")
+            logger.info("Transcribing audio...")
             transcribed_text = await self.voice_service.transcribe_audio(
                 audio_file_path, language=language
             )
-            logger.info(f"✅ Transcription: {transcribed_text}")
+            logger.info(f"Transcription: {transcribed_text}")
 
             # Step 2: Update the last question with the user's answer
             # Get the last question-answer pair (which should have answer=None)
@@ -164,7 +164,7 @@ class InterviewService:
             else:
                 # If no pending question, log a warning but continue
                 logger.warning(
-                    f"⚠️ No pending question found for interview {interview_id}"
+                    f"No pending question found for interview {interview_id}"
                 )
 
             # Step 3: Build conversation history from database
@@ -193,7 +193,7 @@ class InterviewService:
 
             # Step 4: Get LLM response with interviewer personality (next question)
             logger.info(
-                f"🔄 Getting {interview.interviewer_style} interviewer response..."
+                f"Getting {interview.interviewer_style} interviewer response..."
             )
             llm_response = await self.llm_service.chat(
                 transcribed_text,
@@ -325,6 +325,96 @@ class InterviewService:
         except Exception as e:
             db.rollback()
             logger.error(f"Error ending interview: {str(e)}")
+            raise
+
+    async def generate_example_response(
+        self,
+        db: Session,
+        interview_id: int,
+        question_id: int,
+        user_id: int,
+    ) -> dict:
+        """
+        Generate an example response for a specific question in an interview.
+
+        Args:
+            db: Database session
+            interview_id: Interview identifier
+            question_id: Question-answer identifier
+            user_id: User identifier
+
+        Returns:
+            Dict with the updated question-answer data
+        """
+        try:
+            # Get interview from database
+            interview = db.query(Interview).filter(Interview.id == interview_id).first()
+            if not interview:
+                raise ValueError(f"Interview {interview_id} not found")
+
+            # Check authorization
+            if interview.user_id != user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Not authorized to access this interview",
+                )
+
+            # Get the specific question-answer
+            qa = (
+                db.query(QuestionAnswer)
+                .filter(
+                    QuestionAnswer.id == question_id,
+                    QuestionAnswer.interview_id == interview_id,
+                )
+                .first()
+            )
+            if not qa:
+                raise ValueError(
+                    f"Question {question_id} not found in interview {interview_id}"
+                )
+
+            logger.info(
+                f"Generating example response for question {question_id} in interview {interview_id}"
+            )
+
+            # Get candidate context
+            candidate_context = ""
+            if interview.user:
+                db.refresh(interview.user)
+                if interview.user.raw_resume_text:
+                    candidate_context = interview.user.raw_resume_text
+                    logger.info(
+                        f"Using candidate context (length: {len(candidate_context)})"
+                    )
+
+            # Generate example response using LLM
+            example_response = await self.llm_service.generate_example_response(
+                question=qa.question,
+                candidate_context=candidate_context,
+                job_description=interview.job_description or "",
+            )
+
+            # Save the example response
+            qa.response_example = example_response
+            db.commit()
+            db.refresh(qa)
+
+            logger.info(f"Example response generated and saved for QA {question_id}")
+
+            # Return the updated question-answer object as JSON
+            return {
+                "id": qa.id,
+                "question": qa.question,
+                "answer": qa.answer,
+                "response_example": qa.response_example,
+                "feedback": qa.feedback,
+                "grade": qa.grade,
+                "interview_id": qa.interview_id,
+            }
+
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error generating example response: {str(e)}")
             raise
 
     def get_interview_list(
@@ -459,7 +549,7 @@ class InterviewService:
 
         db.delete(interview)
         db.commit()
-        logger.info(f"🗑️ Deleted interview: {interview_id}")
+        logger.info(f"Deleted interview: {interview_id}")
         return True
 
     def get_interview_summary(self, db: Session, interview_id: int) -> dict | None:
@@ -526,7 +616,9 @@ class InterviewService:
         for qa in interview.question_answers:
             summary["questions"].append(
                 {
+                    "id": qa.id,
                     "question": qa.question,
+                    "response_example": qa.response_example,
                     "answer": qa.answer,
                     "grade": qa.grade,
                     "feedback": qa.feedback,
@@ -565,9 +657,9 @@ def get_interview_service() -> InterviewService:
     """Get or create the interview service singleton."""
     global _interview_service_instance
     if _interview_service_instance is None:
-        logger.info("🚀 Creating interview_service singleton...")
+        logger.info("Creating interview_service singleton...")
         _interview_service_instance = InterviewService()
-        logger.info("✅ interview_service singleton created!")
+        logger.info("interview_service singleton created!")
     return _interview_service_instance
 
 

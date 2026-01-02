@@ -152,6 +152,27 @@ interview:
         "overall_comment": "string"
     }}
 
+  example_response: |
+    Tu es un expert en entretien d'embauche. Le candidat a besoin d'un exemple de réponse pour cette question d'entretien.
+
+    QUESTION: {question}
+
+    CONTEXTE DU CANDIDAT:
+    {candidate_context}
+
+    DESCRIPTION DU POSTE (si disponible):
+    {job_description}
+
+    Instructions:
+    - Génère une réponse exemple professionnelle et convaincante
+    - La réponse doit être adaptée au profil du candidat (utilise ses expériences réelles si disponibles)
+    - Reste factuel et cohérent avec le CV du candidat
+    - Donne une réponse structurée et complète (2-4 phrases)
+    - La réponse doit démontrer les compétences pertinentes pour le poste
+    - Utilise un ton professionnel et confiant
+
+    Réponds UNIQUEMENT avec le texte de la réponse exemple, sans introduction ni conclusion.
+
 resume:
   extraction: |
     You are a strict Resume Parsing API.

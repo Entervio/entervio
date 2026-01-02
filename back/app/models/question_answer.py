@@ -10,6 +10,7 @@ class QuestionAnswer(Base):
     id = Column(Integer, primary_key=True, index=True)
     question = Column(Text, nullable=False)
     answer = Column(Text, nullable=True)
+    response_example = Column(Text, nullable=True)
     feedback = Column(Text, nullable=True)
     grade = Column(Integer, nullable=True)
     interview_id = Column(Integer, ForeignKey("interviews.id"), nullable=False)
