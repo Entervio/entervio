@@ -4,7 +4,7 @@ from fastapi import APIRouter
 
 from app.core.auth import CurrentUser
 from app.core.deps import DbSession
-from app.models.application_create import ApplicationCreate
+from app.schemas.application_create import ApplicationCreate
 from app.services.applications_service import application_service
 
 router = APIRouter()

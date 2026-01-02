@@ -3,7 +3,7 @@ from typing import Any
 from app.core.auth import CurrentUser
 from app.core.deps import DbSession
 from app.models.application import Application
-from app.models.application_create import ApplicationCreate
+from app.schemas.application_create import ApplicationCreate
 
 
 class ApplicationService:
