@@ -10,7 +10,6 @@ from sentry_sdk.integrations.starlette import StarletteIntegration
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.scheduler import shutdown_scheduler, start_scheduler
-from app.services.grading_service import grading_service
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -28,7 +27,6 @@ async def lifespan(app: FastAPI):
     yield
 
     shutdown_scheduler()
-    grading_service.shutdown(wait=True)
 
 
 sentry_sdk.init(

@@ -201,18 +201,18 @@ class LLMService:
             raise
 
     async def grade_response(
-        self, question: str, answer: str, interviewer_type: InterviewerStyle
+        self, question: str, answer: str, interviewer_style: InterviewerStyle
     ) -> dict[str, any]:
         """
         Grade a candidate's response to an interview question.
         """
-        logger.info(f"Grading response with {interviewer_type} interviewer...")
+        logger.info(f"📊 Grading response with {interviewer_style} interviewer...")
 
         if not self.groq_client:
             return {"grade": 5, "feedback": "Service non disponible"}
 
         try:
-            system_prompt = get_system_prompt(interviewer_type)
+            system_prompt = get_system_prompt(interviewer_style)
 
             grading_prompt = prompt_manager.format_prompt(
                 "interview.grading", question=question, answer=answer

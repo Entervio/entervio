@@ -3,7 +3,7 @@ import os
 import tempfile
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
 
 from app.core.auth import CurrentUser
 from app.core.deps import DbSession
@@ -23,9 +23,8 @@ async def get_interviews(
     Get list of interviews, optionally filtered by candidate_id.
 
     Args:
-        candidate_id: Optional candidate ID to filter interviews
+        user: Current authenticated user
         db: Database session
-        interview_service: Interview service instance
 
     Returns:
         List of interviews with id, candidate_id, interviewer_style, question_count, and average grade
@@ -60,6 +59,7 @@ async def process_audio_response(
     audio: Annotated[UploadFile, File()],
     user: CurrentUser,
     db: DbSession,
+    background_tasks: BackgroundTasks,
     language: Annotated[str, Form()] = "fr",
 ):
     """Process audio response from candidate."""
@@ -79,6 +79,7 @@ async def process_audio_response(
                 interview_id=interview_id,
                 audio_file_path=temp_audio_path,
                 user_id=user.id,
+                background_tasks=background_tasks,
                 language=language,
             )
             return result

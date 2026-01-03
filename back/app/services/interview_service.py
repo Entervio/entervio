@@ -3,7 +3,7 @@
 import json
 import logging
 
-from fastapi import HTTPException, status
+from fastapi import BackgroundTasks, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.comment import FeedbackComment, FeedbackCommentType
@@ -23,11 +23,11 @@ class InterviewService:
 
     def __init__(self):
         """Initialize the interview service."""
-        logger.info("🔄 Initializing InterviewService...")
+        logger.info("Initializing InterviewService...")
         self.llm_service = llm_service
         self.voice_service = voice_service
         self.grading_service = grading_service
-        logger.info("✅ InterviewService initialized!")
+        logger.info("InterviewService initialized!")
 
     async def start_interview(
         self,
@@ -41,8 +41,9 @@ class InterviewService:
 
         Args:
             db: Database session
-            candidate_name: Name of the interviewee
             interviewer_style: Style of interviewer (nice, neutral, mean)
+            user: User object
+            job_description: Optional job description
 
         Returns:
             Dict with interview_id, greeting text, and interview details
@@ -61,16 +62,13 @@ class InterviewService:
 
             # Get candidate context if available
             candidate_context = ""
-            # Reconstruct context from relational data if possible, or use raw text as fallback
             if user:
                 if user.raw_resume_text:
                     candidate_context = user.raw_resume_text
                 elif user.work_experiences or user.projects:
-                    # Fallback: construct simple context string from DB models
                     pass
 
             if candidate_context == "" and (user.work_experiences or user.projects):
-                # Quick reconstruction if raw text missing
                 candidate_context = f"User has {len(user.work_experiences)} jobs and {len(user.projects)} projects."
 
             if candidate_context != "":
@@ -84,10 +82,10 @@ class InterviewService:
                 job_description=job_description,
             )
 
-            # Create initial greeting as first question (Q = LLM output, A = user response)
+            # Create initial greeting as first question
             greeting_qa = QuestionAnswer(
-                question=greeting_text,  # LLM's greeting/question
-                answer=None,  # User's response will be added in next interaction
+                question=greeting_text,
+                answer=None,
                 interview_id=db_interview.id,
             )
             db.add(greeting_qa)
@@ -97,9 +95,7 @@ class InterviewService:
             logger.info(f"Generated {interviewer_style} greeting for {user.first_name}")
 
             return {
-                "session_id": str(
-                    db_interview.id
-                ),  # Return as string for compatibility
+                "session_id": str(db_interview.id),
                 "interview_id": db_interview.id,
                 "text": greeting_text,
                 "candidate_name": user.first_name,
@@ -118,6 +114,7 @@ class InterviewService:
         interview_id: int,
         audio_file_path: str,
         user_id: int,
+        background_tasks: BackgroundTasks,
         language: str = "fr",
     ) -> dict:
         """
@@ -127,6 +124,8 @@ class InterviewService:
             db: Database session
             interview_id: Interview identifier
             audio_file_path: Path to audio file
+            user_id: User identifier
+            background_tasks: FastAPI BackgroundTasks for async grading
             language: Language code
 
         Returns:
@@ -154,15 +153,13 @@ class InterviewService:
             logger.info(f"Transcription: {transcribed_text}")
 
             # Step 2: Update the last question with the user's answer
-            # Get the last question-answer pair (which should have answer=None)
             last_qa = (
                 interview.question_answers[-1] if interview.question_answers else None
             )
             if last_qa and last_qa.answer is None:
                 last_qa.answer = transcribed_text
-                db.flush()  # Flush to get the ID if needed
+                db.flush()
             else:
-                # If no pending question, log a warning but continue
                 logger.warning(
                     f"No pending question found for interview {interview_id}"
                 )
@@ -172,8 +169,6 @@ class InterviewService:
 
             candidate_context = ""
             if interview.user:
-                # Ensure we have the latest data
-                # The db object is passed as an argument, not self.db
                 db.refresh(interview.user)
                 if interview.user.raw_resume_text:
                     logger.info(
@@ -191,7 +186,7 @@ class InterviewService:
                 f"Passing candidate_context to LLM (Length: {len(candidate_context)})"
             )
 
-            # Step 4: Get LLM response with interviewer personality (next question)
+            # Step 4: Get LLM response with interviewer personality
             logger.info(
                 f"Getting {interview.interviewer_style} interviewer response..."
             )
@@ -206,8 +201,8 @@ class InterviewService:
 
             # Step 5: Create new question-answer record
             qa = QuestionAnswer(
-                question=llm_response,  # LLM's next question
-                answer=None,  # User's response will be added in next interaction
+                question=llm_response,
+                answer=None,
                 interview_id=interview.id,
             )
             interview.question_count = interview.question_count + 1
@@ -215,14 +210,16 @@ class InterviewService:
             db.add(qa)
             db.commit()
 
+            # Schedule background grading for the previous answer
             if last_qa and last_qa.answer:
-                grading_service.grade_and_update_async(
+                background_tasks.add_task(
+                    self.grading_service.grade_and_update,
                     qa_id=last_qa.id,
                     question=last_qa.question,
                     answer=last_qa.answer,
                     interviewer_style=interview.interviewer_style,
                 )
-                logger.info(f"Background grading task started for QA {last_qa.id}")
+                logger.info(f"Background grading task scheduled for QA {last_qa.id}")
 
             return {
                 "transcription": transcribed_text,
@@ -279,7 +276,7 @@ class InterviewService:
                 overall_comment=summary.get("overall_comment", ""),
             )
             db.add(feedback)
-            db.flush()  # Get feedback.id before adding comments
+            db.flush()
 
             # Create FeedbackComment records
             comment_order = 0
@@ -438,14 +435,12 @@ class InterviewService:
             if interview.global_feedback:
                 try:
                     summary_data = json.loads(interview.global_feedback)
-                    # Use .get() to avoid errors if score is missing
                     if "score" in summary_data:
                         final_grade = float(summary_data["score"])
                 except Exception:
-                    # If JSON parse fails or other error, fall back to average
                     pass
 
-            # Fallback to average calculation if no valid global score found (and it is 0)
+            # Fallback to average calculation if no valid global score found
             if final_grade == 0:
                 grades = [
                     qa.grade
@@ -533,6 +528,7 @@ class InterviewService:
         Args:
             db: Database session
             interview_id: Interview identifier
+            user_id: User identifier
 
         Returns:
             True if deleted, False if not found
@@ -576,9 +572,7 @@ class InterviewService:
                 total_grade += qa.grade
                 graded_questions += 1
 
-        global_grade = (
-            total_grade / graded_questions if graded_questions > 0 else 0
-        )  # Changed to 0
+        global_grade = total_grade / graded_questions if graded_questions > 0 else 0
 
         # Build feedback structure from Feedback and FeedbackComment
         feedback_data = None
