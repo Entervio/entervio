@@ -15,7 +15,7 @@ import {
   Mic,
   CheckCircle,
 } from "lucide-react";
-import { jobsService, type JobOffer } from "~/services/jobs";
+import { useJobsStore, type JobOffer } from "~/services/jobs-store";
 import { useSetupStore } from "~/services/usesetupstore";
 import { cn } from "~/lib/utils";
 
@@ -88,6 +88,7 @@ function TailorResumeDialog({
   jobDescription: string;
   jobTitle: string;
 }) {
+  const tailorResume = useJobsStore((state) => state.tailorResume);
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState<"idle" | "generating" | "preview">("idle");
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -122,7 +123,7 @@ function TailorResumeDialog({
     }, 1500);
 
     try {
-      const blob = await jobsService.tailorResume(jobDescription);
+      const blob = await tailorResume(jobDescription);
       const url = window.URL.createObjectURL(blob);
       setPdfUrl(url);
       setStep("preview");
@@ -252,6 +253,7 @@ function GenerateCoverLetterDialog({
   jobDescription: string;
   jobTitle: string;
 }) {
+  const generateCoverLetter = useJobsStore((state) => state.generateCoverLetter);
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState<"idle" | "generating" | "preview">("idle");
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -287,7 +289,7 @@ function GenerateCoverLetterDialog({
     }, 1800);
 
     try {
-      const blob = await jobsService.generateCoverLetter(jobDescription);
+      const blob = await generateCoverLetter(jobDescription);
       const url = window.URL.createObjectURL(blob);
       setPdfUrl(url);
       setStep("preview");
@@ -511,14 +513,13 @@ function JobCard({
 function JobDetail({
   job,
   onBack,
-  onApply,
 }: {
   job: JobOffer | null;
   onBack: () => void;
-  onApply: (jobId: string) => void;
 }) {
   const navigate = useNavigate();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const trackApplication = useJobsStore((state) => state.trackApplication);
 
   // Scroll to top when job changes
   useEffect(() => {
@@ -558,13 +559,11 @@ function JobDetail({
 
     // 2. Track in backend
     try {
-      await jobsService.trackApplication(
+      await trackApplication(
         job.id,
         job.intitule,
         job.entreprise?.nom,
       );
-      // 3. Update local state
-      onApply(job.id);
     } catch (error) {
       console.error("Failed to track application:", error);
     }
@@ -764,12 +763,15 @@ function JobDetail({
 
 export default function JobsSearch() {
   const [nlQuery, setNlQuery] = useState("");
-  const [jobs, setJobs] = useState<JobOffer[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
-  const selectedJob = jobs.find((j) => j.id === selectedJobId) || null;
+  // Use store state with safe defaults
+  const currentJobs = useJobsStore((state) => state.currentJobs ?? []);
+  const isLoading = useJobsStore((state) => state.isLoading ?? false);
+  const hasSearched = useJobsStore((state) => state.hasSearched ?? false);
+  const smartSearch = useJobsStore((state) => state.smartSearch);
+
+  const selectedJob = currentJobs.find((j) => j.id === selectedJobId) || null;
   const showDetail = selectedJobId !== null;
 
   const handleJobClick = (id: string) => {
@@ -777,12 +779,9 @@ export default function JobsSearch() {
   };
 
   const handleSmartSearch = async () => {
-    setIsLoading(true);
-    setJobs([]); // Clear previous results
     setSelectedJobId(null);
     try {
-      const results = await jobsService.smartSearch(undefined, nlQuery);
-      setJobs(results);
+      const results = await smartSearch(undefined, nlQuery);
       if (results.length > 0) {
         const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
         if (isDesktop) {
@@ -791,16 +790,7 @@ export default function JobsSearch() {
       }
     } catch (error) {
       console.error("Smart search failed:", error);
-    } finally {
-      setIsLoading(false);
-      setHasSearched(true);
     }
-  };
-
-  const handleApply = (jobId: string) => {
-    setJobs((prev) =>
-      prev.map((j) => (j.id === jobId ? { ...j, is_applied: true } : j)),
-    );
   };
 
   const quickChips = [
@@ -874,7 +864,7 @@ export default function JobsSearch() {
 
       {/* Main Content: Split View */}
       <div className="flex-1 min-h-0 w-full max-w-[1600px] mx-auto p-4 md:p-6">
-        {jobs.length > 0 ? (
+        {currentJobs.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
             {/* Left Column: List (Scrollable) */}
             <div
@@ -885,10 +875,10 @@ export default function JobsSearch() {
             >
               <div className="mb-4 flex items-center justify-between px-1">
                 <span className="text-sm font-medium text-gray-500">
-                  {jobs.length} résultats
+                  {currentJobs.length} résultats
                 </span>
               </div>
-              {jobs.map((job) => (
+              {currentJobs.map((job) => (
                 <JobCard
                   key={job.id}
                   job={job}
@@ -908,7 +898,6 @@ export default function JobsSearch() {
               <JobDetail
                 job={selectedJob}
                 onBack={() => setSelectedJobId(null)}
-                onApply={handleApply}
               />
             </div>
           </div>
