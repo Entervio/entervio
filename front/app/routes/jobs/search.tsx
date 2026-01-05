@@ -253,7 +253,9 @@ function GenerateCoverLetterDialog({
   jobDescription: string;
   jobTitle: string;
 }) {
-  const generateCoverLetter = useJobsStore((state) => state.generateCoverLetter);
+  const generateCoverLetter = useJobsStore(
+    (state) => state.generateCoverLetter,
+  );
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState<"idle" | "generating" | "preview">("idle");
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -445,10 +447,10 @@ function JobCard({
         )}
       />
 
-      <div className="flex justify-between items-start gap-3 mb-1">
+      <div className="flex justify-between items-center gap-3 mb-1">
         <h3
           className={cn(
-            "font-bold text-lg leading-tight transition-colors text-gray-900",
+            "font-bold text-lg leading-tight transition-colors text-gray-900 flex-1",
             isSelected && "text-primary",
           )}
         >
@@ -559,11 +561,7 @@ function JobDetail({
 
     // 2. Track in backend
     try {
-      await trackApplication(
-        job.id,
-        job.intitule,
-        job.entreprise?.nom,
-      );
+      await trackApplication(job.id, job.intitule, job.entreprise?.nom);
     } catch (error) {
       console.error("Failed to track application:", error);
     }
