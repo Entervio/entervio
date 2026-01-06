@@ -148,7 +148,11 @@ class InterviewService:
             # Step 1: Transcribe audio using voice service
             logger.info("Transcribing audio...")
             transcribed_text = await self.voice_service.transcribe_audio(
-                audio_file_path, language=language
+                audio_file_path,
+                language=language,
+                interview_id=interview_id,  # ✅ Pass for tracking
+                user_id=user_id,  # ✅ Pass for tracking
+                db=db,  # ✅ Pass DB session
             )
             logger.info(f"Transcription: {transcribed_text}")
 
@@ -191,11 +195,13 @@ class InterviewService:
                 f"Getting {interview.interviewer_style} interviewer response..."
             )
             llm_response = await self.llm_service.chat(
+                db,
                 transcribed_text,
                 conversation_history,
                 interview.interviewer_style,
                 candidate_context=candidate_context,
                 job_description=interview.job_description,
+                interview_id=interview_id,
             )
             logger.info(f"LLM response: {llm_response[:100]}...")
 
@@ -218,6 +224,7 @@ class InterviewService:
                     question=last_qa.question,
                     answer=last_qa.answer,
                     interviewer_style=interview.interviewer_style,
+                    interview_id=interview_id,
                 )
                 logger.info(f"Background grading task scheduled for QA {last_qa.id}")
 
@@ -267,7 +274,10 @@ class InterviewService:
             # Build conversation history and get LLM feedback
             conversation_history = self._build_conversation_history(interview)
             summary = await self.llm_service.end_interview(
-                conversation_history, interview.interviewer_style
+                db,
+                conversation_history,
+                interview.interviewer_style,
+                interview_id=interview_id,
             )
 
             # Create Feedback record
@@ -389,6 +399,7 @@ class InterviewService:
                 question=qa.question,
                 candidate_context=candidate_context,
                 job_description=interview.job_description or "",
+                interview_id=interview_id,
             )
 
             # Save the example response

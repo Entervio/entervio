@@ -17,6 +17,7 @@ from app.models.feedback import Feedback
 from app.models.interview import Interview
 from app.models.question_answer import QuestionAnswer
 from app.models.resume_models import Education, Language, Project, Skill, WorkExperience
+from app.models.token_usage import TokenUsage
 from app.models.user import User
 
 # Alembic Config object

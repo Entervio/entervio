@@ -8,6 +8,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
+from app.core.auth import CurrentUser  # ✅ Add this import
 from app.core.deps import DbSession
 from app.services.interview_service import interview_service
 from app.services.voice_service import voice_service
@@ -19,7 +20,12 @@ InterviewerType = Literal["nice", "neutral", "mean"]
 
 
 @router.get("/interview/{interview_id}/audio")
-async def get_audio(interview_id: int, text: str, db: DbSession):
+async def get_audio(
+    interview_id: int,
+    text: str,
+    user: CurrentUser,  # ✅ Add authenticated user
+    db: DbSession,
+):
     """Convert text to speech and return audio file."""
     try:
         # Verify interview exists
@@ -33,8 +39,13 @@ async def get_audio(interview_id: int, text: str, db: DbSession):
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as temp_file:
             temp_path = temp_file.name
 
-            # Collect all audio chunks
-            async for audio_chunk in voice_service.text_to_speech_stream(text):
+            # Collect all audio chunks WITH TRACKING
+            async for audio_chunk in voice_service.text_to_speech_stream(
+                text=text,
+                interview_id=interview_id,  # ✅ Pass interview_id
+                user_id=user.id,  # ✅ Pass user_id
+                db=db,  # ✅ Pass DB session
+            ):
                 temp_file.write(audio_chunk)
 
         # Create a generator to stream the file

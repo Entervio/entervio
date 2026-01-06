@@ -25,6 +25,7 @@ class GradingService:
         question: str,
         answer: str,
         interviewer_style: InterviewerStyle,
+        interview_id: int,
     ):
         """
         Grade a question-answer pair and update the database.
@@ -35,37 +36,41 @@ class GradingService:
             question: The interview question
             answer: The candidate's answer
             interviewer_style: Interview style context
+            interview_id: Interview ID
         """
+        db = next(get_db())
         try:
             logger.info(f"Starting background grading for QA {qa_id}")
 
-            # Get grading from LLM
+            # Get grading from LLM - now passing db session
             grade_result = await self.llm_service.grade_response(
+                db=db,
                 question=question,
                 answer=answer,
                 interviewer_style=interviewer_style,
+                qa_id=qa_id,
+                interview_id=interview_id,
             )
 
             # Update database
-            db = next(get_db())
-            try:
-                qa = db.query(QuestionAnswer).filter(QuestionAnswer.id == qa_id).first()
-                if qa:
-                    qa.grade = int(grade_result["grade"])
-                    qa.feedback = grade_result["feedback"]
-                    db.commit()
-                    logger.info(
-                        f"Grading completed for QA {qa_id}: {grade_result['grade']}/100"
-                    )
-                else:
-                    logger.error(f"QuestionAnswer {qa_id} not found")
-            finally:
-                db.close()
+            qa = db.query(QuestionAnswer).filter(QuestionAnswer.id == qa_id).first()
+            if qa:
+                qa.grade = int(grade_result["grade"])
+                qa.feedback = grade_result["feedback"]
+                db.commit()
+                logger.info(
+                    f"Grading completed for QA {qa_id}: {grade_result['grade']}/100"
+                )
+            else:
+                logger.error(f"QuestionAnswer {qa_id} not found")
 
         except Exception as e:
+            db.rollback()
             logger.error(
                 f"Background grading failed for QA {qa_id}: {str(e)}", exc_info=True
             )
+        finally:
+            db.close()
 
 
 # Singleton instance

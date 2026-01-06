@@ -6,11 +6,13 @@ from typing import Any, Literal
 
 from groq import Groq
 from pydantic import BaseModel, field_validator
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.prompt_manager import prompt_manager
 from app.mcp.server import search_jobs
 from app.models.interview import InterviewerStyle
+from app.models.token_usage import TokenUsage
 
 
 class SearchJobsArgs(BaseModel):
@@ -141,17 +143,77 @@ class LLMService:
             candidate_name=candidate_name,
         )
 
+    def _log_token_usage(
+        self,
+        db: Session,
+        response,
+        operation: str,
+        interview_id: int,
+        context: dict = None,
+    ):
+        """
+        Log token usage from Groq API response.
+
+        Args:
+            db: SQLAlchemy database session
+            response: Groq API response object
+            operation: Name of the operation (e.g., 'chat', 'grading', 'feedback')
+            interview_id: ID of the interview
+            context: Additional context like user_id (dict)
+        """
+        try:
+            usage = response.usage
+            prompt_tokens = usage.prompt_tokens
+            completion_tokens = usage.completion_tokens
+            total_tokens = usage.total_tokens
+
+            context_str = f" | {context}" if context else ""
+            logger.info(
+                f"Token Usage [{operation}]{context_str} | "
+                f"Input: {prompt_tokens} | Output: {completion_tokens} | "
+                f"Total: {total_tokens}"
+            )
+
+            # Store in database
+            token_record = TokenUsage(
+                interview_id=interview_id,
+                user_id=context.get("user_id") if context else None,
+                operation=operation,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+                model="llama-3.3-70b-versatile",
+                context=context,
+            )
+            db.add(token_record)
+            db.flush()  # Flush to database without committing
+            logger.info(f"Token usage recorded in database for operation: {operation}")
+
+            return {
+                "operation": operation,
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": total_tokens,
+                "context": context,
+            }
+        except AttributeError as e:
+            logger.warning(f"Could not extract token usage: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Error storing token usage: {e}")
+            return None
+
     async def chat(
         self,
+        db: Session,
         message: str,
         conversation_history: list[dict[str, str]],
         interviewer_type: InterviewerStyle,
         candidate_context: str = "",
         job_description: str = "",
+        interview_id: int = None,
     ) -> str:
-        """
-        Send message to Groq and get interviewer response.
-        """
+        """Send message to Groq and get interviewer response."""
         logger.info(
             f"Processing candidate response with {interviewer_type} interviewer"
         )
@@ -160,28 +222,20 @@ class LLMService:
             raise ValueError("Groq client not initialized")
 
         try:
-            # 1. Build System Prompt
             system_prompt = get_system_prompt(
                 interviewer_type, candidate_context, job_description
             )
 
-            # 2. Build Messages
             messages = [{"role": "system", "content": system_prompt}]
 
-            # Add history
             for msg in conversation_history:
-                # Groq/OpenAI format is 'assistant' for model
                 role = "assistant" if msg["role"] == "assistant" else msg["role"]
-                # Map 'model' back to 'assistant' if it came from Gemini history
                 if role == "model":
                     role = "assistant"
                 messages.append({"role": role, "content": msg["content"]})
 
-            # Add current message (if not already in history? usually caller appends it, but let's check)
-            # The signature says 'message' is passed separately.
             messages.append({"role": "user", "content": message})
 
-            # 3. Call API
             completion = self.groq_client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=messages,
@@ -189,8 +243,15 @@ class LLMService:
                 max_tokens=1024,
             )
 
-            response_text = completion.choices[0].message.content
+            self._log_token_usage(
+                db,
+                completion,
+                "chat",
+                interview_id,
+                {"interview_id": interview_id, "interviewer_type": interviewer_type},
+            )
 
+            response_text = completion.choices[0].message.content
             logger.info(
                 f"Got {interviewer_type} interviewer response ({len(response_text)} chars)"
             )
@@ -201,23 +262,25 @@ class LLMService:
             raise
 
     async def grade_response(
-        self, question: str, answer: str, interviewer_style: InterviewerStyle
+        self,
+        db: Session,
+        question: str,
+        answer: str,
+        interviewer_style: InterviewerStyle,
+        qa_id: int = None,
+        interview_id: int = None,
     ) -> dict[str, any]:
-        """
-        Grade a candidate's response to an interview question.
-        """
-        logger.info(f"📊 Grading response with {interviewer_style} interviewer...")
+        """Grade a candidate's response to an interview question."""
+        logger.info(f"Grading response with {interviewer_style} interviewer...")
 
         if not self.groq_client:
             return {"grade": 5, "feedback": "Service non disponible"}
 
         try:
             system_prompt = get_system_prompt(interviewer_style)
-
             grading_prompt = prompt_manager.format_prompt(
                 "interview.grading", question=question, answer=answer
             )
-
             grading_system = system_prompt + prompt_manager.get(
                 "interview.grading_system_suffix"
             )
@@ -225,13 +288,19 @@ class LLMService:
             completion = self.groq_client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[
-                    {
-                        "role": "system",
-                        "content": grading_system,
-                    },
+                    {"role": "system", "content": grading_system},
                     {"role": "user", "content": grading_prompt},
                 ],
                 response_format={"type": "json_object"},
+            )
+
+            # 🎯 LOG TOKEN USAGE
+            self._log_token_usage(
+                db,
+                completion,
+                "grading",
+                interview_id=interview_id,
+                context={"qa_id": qa_id, "interviewer_style": interviewer_style},
             )
 
             result = json.loads(completion.choices[0].message.content)
@@ -244,12 +313,12 @@ class LLMService:
 
     async def end_interview(
         self,
+        db: Session,
         conversation_history: list[dict[str, str]],
         interviewer_type: InterviewerStyle,
+        interview_id: int = None,
     ) -> dict[str, Any]:
-        """
-        Generate structured feedback using Groq.
-        """
+        """Generate structured feedback using Groq."""
         logger.info(
             f"Generating structured interview feedback with {interviewer_type} interviewer..."
         )
@@ -258,11 +327,9 @@ class LLMService:
             raise ValueError("Groq client not initialized")
 
         try:
-            # Build valid history for context
             messages = []
             for msg in conversation_history:
                 role = "assistant" if msg["role"] == "assistant" else msg["role"]
-                # fix gemini usage
                 if role == "model":
                     role = "assistant"
                 messages.append({"role": role, "content": msg["content"]})
@@ -270,13 +337,24 @@ class LLMService:
             prompt = prompt_manager.format_prompt(
                 "interview.feedback", interviewer_type=interviewer_type
             )
-
             messages.append({"role": "user", "content": prompt})
 
             completion = self.groq_client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=messages,
                 response_format={"type": "json_object"},
+            )
+
+            # 🎯 LOG TOKEN USAGE
+            self._log_token_usage(
+                db,
+                completion,
+                "end_interview",
+                interview_id=interview_id,
+                context={
+                    "interview_id": interview_id,
+                    "interviewer_type": interviewer_type,
+                },
             )
 
             feedback_data = json.loads(completion.choices[0].message.content)
@@ -295,21 +373,14 @@ class LLMService:
 
     async def generate_example_response(
         self,
+        db: Session,
         question: str,
         candidate_context: str = "",
         job_description: str = "",
+        interview_id: int = None,
+        question_id: int = None,
     ) -> str:
-        """
-        Generate an example response for an interview question.
-
-        Args:
-            question: The interview question
-            candidate_context: Context from resume
-            job_description: Job description context
-
-        Returns:
-            Example response text
-        """
+        """Generate an example response for an interview question."""
         logger.info(f"Generating example response for question: {question[:50]}...")
 
         if not self.groq_client:
@@ -334,6 +405,15 @@ class LLMService:
                 ],
                 temperature=0.7,
                 max_tokens=512,
+            )
+
+            # 🎯 LOG TOKEN USAGE
+            self._log_token_usage(
+                db,
+                completion,
+                "example_response",
+                interview_id,
+                {"interview_id": interview_id, "question_id": question_id},
             )
 
             example_response = completion.choices[0].message.content.strip()
@@ -488,26 +568,8 @@ class LLMService:
                                 f"Pydantic validation failed for search_jobs args: {e}"
                             )
                             continue
-                        try:
-                            raw_args = json.loads(tool_call.function.arguments)
-                            validated_args = SearchJobsArgs.model_validate(raw_args)
-                            logger.info(
-                                f"Calling search_jobs with validated args: {validated_args.model_dump(exclude_none=True)}"
-                            )
-                        except json.JSONDecodeError as e:
-                            logger.error(
-                                f"Failed to parse tool call arguments as JSON: {e}"
-                            )
-                            continue
-                        except Exception as e:
-                            logger.error(
-                                f"Pydantic validation failed for search_jobs args: {e}"
-                            )
-                            continue
 
                         # Call the imported function with validated args
-                        # Call the imported function with validated args
-                        # search_jobs returns a JSON string
                         jobs_json = await search_jobs.fn(
                             query=validated_args.query,
                             location=validated_args.location,
@@ -528,15 +590,11 @@ class LLMService:
                             logger.error(
                                 f"Failed to parse jobs JSON from tool: {e}. Content: {jobs_json[:200]}..."
                             )
-            unique_jobs = list(
-                {job["id"]: job for job in all_found_jobs if job.get("id")}.values()
-            )
+
             unique_jobs = list(
                 {job["id"]: job for job in all_found_jobs if job.get("id")}.values()
             )
 
-            logger.info(f"Extracted {len(unique_jobs)} unique jobs from tool execution")
-            return unique_jobs
             logger.info(f"Extracted {len(unique_jobs)} unique jobs from tool execution")
             return unique_jobs
 
