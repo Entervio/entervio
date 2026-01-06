@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { User, Briefcase, Mic, LogOut, Menu, X } from "lucide-react";
+import { User, Briefcase, Mic, LogOut, Menu, X, Wand2 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { useAuth } from "~/context/AuthContext";
 import { useState } from "react";
@@ -51,6 +51,13 @@ export function Navbar() {
             >
               <Briefcase className="w-4 h-4" />
               Offres
+            </Link>
+            <Link
+              to="/tools"
+              className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-2"
+            >
+              <Wand2 className="w-4 h-4" />
+              L'Atelier
             </Link>
           </div>
         </div>
@@ -161,6 +168,18 @@ export function Navbar() {
             >
               <Briefcase className="w-4 h-4" />
               Offres
+            </Link>
+            <Link
+              to="/tools"
+              className={`text-sm font-medium text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all flex items-center gap-3 py-3 px-4 rounded-lg transform ${
+                isMobileMenuOpen
+                  ? "translate-x-0 opacity-100"
+                  : "-translate-x-4 opacity-0"
+              } transition-all duration-300 delay-300`}
+              onClick={closeMobileMenu}
+            >
+              <Wand2 className="w-4 h-4" />
+              L'Atelier
             </Link>
 
             {user ? (

@@ -6,7 +6,7 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { useAuth } from "~/context/AuthContext";
 
-export function meta({ }: Route.MetaArgs) {
+export function meta({}: Route.MetaArgs) {
   return [
     { title: "Connexion - Entervio" },
     { name: "description", content: "Connectez-vous pour accéder à Entervio" },
@@ -54,7 +54,9 @@ export default function Login() {
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background">
       <Card className="w-full max-w-md border-border bg-card/50 backdrop-blur-sm shadow-2xl shadow-primary/5">
         <CardHeader className="space-y-1 text-center pb-8">
-          <CardTitle className="text-3xl font-bold tracking-tight">Connexion</CardTitle>
+          <CardTitle className="text-3xl font-bold tracking-tight">
+            Connexion
+          </CardTitle>
           <p className="text-sm text-muted-foreground">
             Entrez vos identifiants pour accéder à votre compte
           </p>
@@ -62,7 +64,10 @@ export default function Login() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="email">
+              <label
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                htmlFor="email"
+              >
                 Email
               </label>
               <Input
@@ -73,12 +78,15 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
-                className="bg-background/50 border-input hover:border-primary/50 transition-colors"
+                className="bg-background border-border/80 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all h-11"
               />
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="password">
+                <label
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  htmlFor="password"
+                >
                   Mot de passe
                 </label>
                 <Link
@@ -95,7 +103,7 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
-                className="bg-background/50 border-input hover:border-primary/50 transition-colors"
+                className="bg-background border-border/80 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all h-11"
               />
             </div>
             {error && (
@@ -103,7 +111,11 @@ export default function Login() {
                 {error}
               </div>
             )}
-            <Button type="submit" className="w-full h-11 text-base shadow-lg shadow-primary/20" disabled={submitting}>
+            <Button
+              type="submit"
+              className="w-full h-11 text-base shadow-lg shadow-primary/20"
+              disabled={submitting}
+            >
               {submitting ? "Connexion..." : "Se connecter"}
             </Button>
 
@@ -120,7 +132,10 @@ export default function Login() {
 
             <div className="text-center text-sm text-muted-foreground">
               Pas encore de compte ?{" "}
-              <Link to="/signup" className="text-primary hover:text-primary/80 font-semibold transition-colors hover:underline">
+              <Link
+                to="/signup"
+                className="text-primary hover:text-primary/80 font-semibold transition-colors hover:underline"
+              >
                 Créer un compte
               </Link>
             </div>

@@ -800,7 +800,7 @@ export default function JobsSearch() {
   ];
 
   return (
-    <div className="h-screen bg-[#FAFAFA] text-gray-900 font-sans flex flex-col overflow-hidden">
+    <div className="h-full bg-[#FAFAFA] text-gray-900 font-sans flex flex-col overflow-hidden">
       {/* Header & Search */}
       <div className="bg-white border-b border-gray-200 shrink-0 z-30">
         <div className="max-w-[1600px] mx-auto px-4 md:px-6 py-4">
