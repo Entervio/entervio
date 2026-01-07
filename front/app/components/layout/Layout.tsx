@@ -1,6 +1,7 @@
 import { useLocation } from "react-router";
 import { Navbar } from "./Navbar";
 import { Heart } from "lucide-react";
+import { cn } from "~/lib/utils";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -13,14 +14,20 @@ export function Layout({ children }: LayoutProps) {
   const isOnboardingPage = location.pathname === "/resume";
 
   return (
-    <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/20">
+    <div
+      className={cn(
+        "bg-background text-foreground font-sans selection:bg-primary/20",
+        isSearchPage ? "h-screen flex flex-col" : "min-h-screen",
+      )}
+    >
       {!isOnboardingPage && <Navbar />}
       <main
-        className={
+        className={cn(
           isOnboardingPage
             ? ""
-            : "bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-primary/5 via-background to-background"
-        }
+            : "bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-primary/5 via-background to-background",
+          isSearchPage ? "flex-1 overflow-hidden flex flex-col" : "",
+        )}
       >
         {children}
       </main>
