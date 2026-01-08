@@ -314,11 +314,8 @@ export default function Interview() {
       {/* Error Toast */}
       {error && (
         <div className="fixed top-6 right-6 z-50 animate-in slide-in-from-top-2 fade-in duration-300">
-          <Alert
-            variant="destructive"
-            className="shadow-xl max-w-md bg-destructive text-destructive-foreground border-none rounded-xl"
-          >
-            <AlertDescription className="flex items-center gap-3">
+          <Alert className="shadow-xl max-w-md bg-destructive text-destructive-foreground border-none rounded-xl">
+            <AlertDescription className="flex items-center gap-3 text-destructive-foreground">
               <AlertTriangle className="w-4 h-4 shrink-0" />
               <span className="font-medium">{error}</span>
               <Button
