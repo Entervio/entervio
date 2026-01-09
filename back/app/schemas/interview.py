@@ -29,6 +29,10 @@ class StartInterviewRequest(BaseModel):
     job_description: str | None = None
 
 
+class TextResponseRequest(BaseModel):
+    text: str
+
+
 class InterviewBase(BaseModel):
     interviewee_name: str
     interviewer_style: InterviewerStyle

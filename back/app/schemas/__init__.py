@@ -1,9 +1,10 @@
 from .interview import (
-    Interview, 
-    InterviewCreate, 
+    Interview,
+    InterviewCreate,
     InterviewUpdate,
     QuestionAnswer,
     QuestionAnswerCreate,
     QuestionAnswerUpdate,
-    StartInterviewRequest
+    StartInterviewRequest,
+    TextResponseRequest,
 )

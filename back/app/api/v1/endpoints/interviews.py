@@ -7,7 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Uploa
 
 from app.core.auth import CurrentUser
 from app.core.deps import DbSession
-from app.schemas import StartInterviewRequest
+from app.schemas import StartInterviewRequest, TextResponseRequest
 from app.services.interview_service import interview_service
 
 logger = logging.getLogger(__name__)
@@ -95,6 +95,36 @@ async def process_audio_response(
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Error processing audio: {str(e)}")
+        logger.exception("Full traceback:")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/{interview_id}/respond_text")
+async def process_text_response(
+    interview_id: int,
+    request: TextResponseRequest,
+    user: CurrentUser,
+    db: DbSession,
+    background_tasks: BackgroundTasks,
+):
+    """Process text response from candidate."""
+    try:
+        logger.info(f"Processing text response for interview {interview_id}")
+
+        # Process through service
+        result = await interview_service.process_response(
+            db=db,
+            interview_id=interview_id,
+            user_id=user.id,
+            background_tasks=background_tasks,
+            text_response=request.text,
+        )
+        return result
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        logger.error(f"Error processing text: {str(e)}")
         logger.exception("Full traceback:")
         raise HTTPException(status_code=500, detail=str(e)) from e
 

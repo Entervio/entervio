@@ -22,7 +22,7 @@ export interface QuestionAnswer {
 export interface InterviewSummaryResponse {
   feedback: FeedbackData | null;
   job_description: string;
-  interviewer_style: InterviewerType
+  interviewer_style: InterviewerType;
   questions: QuestionAnswer[];
 }
 
@@ -106,7 +106,7 @@ export const interviewApi = {
    * Start a new interview session
    */
   async startInterview(
-    data: InterviewStartRequest
+    data: InterviewStartRequest,
   ): Promise<InterviewStartResponse> {
     const response = await fetch(
       `${API_BASE_URL}/interviews/start`,
@@ -127,7 +127,7 @@ export const interviewApi = {
     if (!response.ok) {
       throw new ApiError(
         response.status,
-        `Failed to start interview: ${response.status}`
+        `Failed to start interview: ${response.status}`,
       );
     }
 
@@ -148,7 +148,7 @@ export const interviewApi = {
         response.status,
         response.status === 404
           ? "Session not found"
-          : `Failed to get interview info: ${response.status}`
+          : `Failed to get interview info: ${response.status}`,
       );
     }
 
@@ -159,7 +159,7 @@ export const interviewApi = {
    * Get conversation history for an interview
    */
   async getConversationHistory(
-    sessionId: string
+    sessionId: string,
   ): Promise<ConversationHistoryResponse> {
     const response = await fetch(
       `${API_BASE_URL}/interviews/${sessionId}/history`,
@@ -169,7 +169,7 @@ export const interviewApi = {
     if (!response.ok) {
       throw new ApiError(
         response.status,
-        `Failed to get conversation history: ${response.status}`
+        `Failed to get conversation history: ${response.status}`,
       );
     }
 
@@ -182,7 +182,7 @@ export const interviewApi = {
   async submitResponse(
     sessionId: string,
     audioBlob: Blob,
-    language: string = "fr"
+    language: string = "fr",
   ): Promise<InterviewRespondResponse> {
     const formData = new FormData();
     formData.append("audio", audioBlob, "recording.webm");
@@ -199,7 +199,35 @@ export const interviewApi = {
     if (!response.ok) {
       throw new ApiError(
         response.status,
-        `Failed to submit response: ${response.status}`
+        `Failed to submit response: ${response.status}`,
+      );
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Submit a text response to the interview
+   */
+  async submitTextResponse(
+    sessionId: string,
+    text: string,
+  ): Promise<InterviewRespondResponse> {
+    const response = await fetch(
+      `${API_BASE_URL}/interviews/${sessionId}/respond_text`,
+      withAuthHeaders({
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text }),
+      }),
+    );
+
+    if (!response.ok) {
+      throw new ApiError(
+        response.status,
+        `Failed to submit text response: ${response.status}`,
       );
     }
 
@@ -220,7 +248,7 @@ export const interviewApi = {
     if (!response.ok) {
       throw new ApiError(
         response.status,
-        `Failed to end interview: ${response.status}`
+        `Failed to end interview: ${response.status}`,
       );
     }
 
@@ -276,7 +304,7 @@ export const interviewApi = {
     if (!response.ok) {
       throw new ApiError(
         response.status,
-        `Failed to upload resume: ${response.status}`
+        `Failed to upload resume: ${response.status}`,
       );
     }
 
@@ -295,7 +323,7 @@ export const interviewApi = {
     if (!response.ok) {
       throw new ApiError(
         response.status,
-        `Failed to get interviews: ${response.status}`
+        `Failed to get interviews: ${response.status}`,
       );
     }
 
@@ -305,7 +333,9 @@ export const interviewApi = {
   /**
    * Get interview summary with feedback and grades
    */
-  async getInterviewSummary(interviewId: string): Promise<InterviewSummaryResponse> {
+  async getInterviewSummary(
+    interviewId: string,
+  ): Promise<InterviewSummaryResponse> {
     const response = await fetch(
       `${API_BASE_URL}/interviews/${interviewId}/summary`,
       withAuthHeaders(),
@@ -313,7 +343,7 @@ export const interviewApi = {
     if (!response.ok) {
       throw new ApiError(
         response.status,
-        `Failed to get interview summary: ${response.status}`
+        `Failed to get interview summary: ${response.status}`,
       );
     }
     return response.json();
@@ -324,7 +354,7 @@ export const interviewApi = {
    */
   async generateExampleResponse(
     interviewId: string,
-    questionId: number
+    questionId: number,
   ): Promise<QuestionAnswer> {
     const response = await fetch(
       `${API_BASE_URL}/interviews/${interviewId}/questions/${questionId}/example`,
@@ -339,8 +369,8 @@ export const interviewApi = {
         response.status === 404
           ? "Question non trouvée"
           : response.status === 403
-          ? "Non autorisé"
-          : `Erreur lors de la génération: ${response.status}`
+            ? "Non autorisé"
+            : `Erreur lors de la génération: ${response.status}`,
       );
     }
 

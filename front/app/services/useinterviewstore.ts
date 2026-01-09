@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { ApiError } from "~/lib/api";
-import { interviewApi } from "~/lib/interviewApi"
+import { interviewApi } from "~/lib/interviewApi";
 import type { InterviewerType, Message } from "~/types/interview";
 
 interface AudioCache {
@@ -39,6 +39,7 @@ interface InterviewStore {
   startRecording: () => Promise<void>;
   stopRecording: () => void;
   processRecording: () => Promise<void>;
+  sendTextResponse: (text: string) => Promise<void>;
   endInterview: () => Promise<void>;
   setError: (error: string | null) => void;
   cleanup: () => void;
@@ -70,7 +71,7 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
 
   loadInterviewData: async (interviewId: string) => {
     const state = get();
-    
+
     // Prevent duplicate loads - this fixes the double API call issue
     if (state.loadingInterviewId === interviewId) {
       console.log("Already loading this interview, skipping duplicate call");
@@ -161,7 +162,7 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
       } else {
         console.log("Fetching new audio for:", text.substring(0, 50));
         audioUrl = await interviewApi.getAudio(sessionId, text);
-        
+
         // Cache the audio URL
         set((state) => ({
           audioCache: {
@@ -205,7 +206,7 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
 
   replayLastAudio: async () => {
     const { lastAudioText, sessionId, isPlayingAudio } = get();
-    
+
     if (isPlayingAudio) {
       return; // Don't replay if already playing
     }
@@ -291,11 +292,53 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
         messages: [...state.messages, userMessage, assistantMessage],
       }));
 
-      await get().playAudio(sessionId, data.response);
-
       set({ isProcessing: false });
+      await get().playAudio(sessionId, data.response);
     } catch (err) {
       console.error("Error processing recording:", err);
+      set({
+        error:
+          "Erreur lors du traitement de votre réponse. Veuillez réessayer.",
+        isProcessing: false,
+      });
+    }
+  },
+
+  sendTextResponse: async (text: string) => {
+    const { sessionId } = get();
+    if (!sessionId || !text.trim()) {
+      return;
+    }
+
+    set({ isProcessing: true });
+
+    try {
+      const data = await interviewApi.submitTextResponse(sessionId, text);
+
+      set({ questionCount: data.question_count });
+
+      const userMessage: Message = {
+        id: `${Date.now()}-user`,
+        role: "user",
+        text: text,
+        timestamp: new Date(),
+      };
+
+      const assistantMessage: Message = {
+        id: `${Date.now()}-assistant`,
+        role: "assistant",
+        text: data.response,
+        timestamp: new Date(),
+      };
+
+      set((state) => ({
+        messages: [...state.messages, userMessage, assistantMessage],
+      }));
+
+      set({ isProcessing: false });
+      await get().playAudio(sessionId, data.response);
+    } catch (err) {
+      console.error("Error processing text response:", err);
       set({
         error:
           "Erreur lors du traitement de votre réponse. Veuillez réessayer.",
@@ -319,7 +362,6 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
       }));
 
       set({ isProcessing: false });
-
     } catch (err) {
       console.error("Error ending interview:", err);
       set({
@@ -335,7 +377,7 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
 
   cleanup: () => {
     const { currentAudio, audioCache } = get();
-    
+
     // Stop current audio
     if (currentAudio) {
       currentAudio.pause();
@@ -346,7 +388,7 @@ export const useInterviewStore = create<InterviewStore>((set, get) => ({
     Object.values(audioCache).forEach((url) => {
       URL.revokeObjectURL(url);
     });
-    
+
     set({ audioCache: {} });
   },
 

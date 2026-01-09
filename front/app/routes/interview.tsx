@@ -18,6 +18,9 @@ import {
   MoreVertical,
   SkipForward,
   RotateCcw,
+  Send,
+  Keyboard,
+  MessageSquare,
 } from "lucide-react";
 
 export function meta({}: Route.MetaArgs) {
@@ -32,6 +35,8 @@ export default function Interview() {
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showTranscript, setShowTranscript] = useState(false);
+  const [inputMode, setInputMode] = useState<"voice" | "text">("voice");
+  const [textInput, setTextInput] = useState("");
 
   const {
     sessionId,
@@ -53,6 +58,7 @@ export default function Interview() {
     cleanup,
     skipAudio,
     replayLastAudio,
+    sendTextResponse,
   } = useInterviewStore();
 
   useEffect(() => {
@@ -74,6 +80,13 @@ export default function Interview() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const handleTextSubmit = async () => {
+    if (!textInput.trim()) return;
+    const textToSend = textInput;
+    setTextInput("");
+    await sendTextResponse(textToSend);
+  };
 
   const handleEndInterview = async () => {
     await endInterview();
@@ -215,47 +228,97 @@ export default function Interview() {
       </main>
 
       {/* Floating Control Bar */}
-      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-6">
+      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-xl px-6">
         <div className="bg-white/90 backdrop-blur-xl border border-border/50 shadow-[0_8px_32px_rgba(0,0,0,0.12)] rounded-2xl p-2 flex items-center justify-between gap-2">
           <Button
             variant="ghost"
             size="icon"
-            className="rounded-xl text-muted-foreground hover:text-foreground"
+            className="rounded-xl text-muted-foreground hover:text-foreground shrink-0"
             onClick={() => setShowTranscript(!showTranscript)}
           >
             <MoreVertical className="w-5 h-5" />
-          </Button>
-
-          <Button
-            size="lg"
-            onClick={isRecording ? stopRecording : startRecording}
-            disabled={
-              !sessionId || isProcessing || !interviewStarted || isPlayingAudio
-            }
-            className={cn(
-              "flex-1 h-14 rounded-xl text-lg font-medium shadow-lg transition-all duration-300",
-              isRecording
-                ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-                : "bg-primary hover:bg-primary/90 text-primary-foreground",
-            )}
-          >
-            {isRecording ? (
-              <div className="flex items-center gap-2">
-                <StopCircle className="w-5 h-5 fill-current animate-pulse" />
-                <span>Terminer la réponse</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Mic className="w-5 h-5" />
-                <span>{isProcessing ? "Analyse..." : "Répondre"}</span>
-              </div>
-            )}
-          </Button>
-
+          </Button>{" "}
           <Button
             variant="ghost"
             size="icon"
-            className="rounded-xl text-muted-foreground hover:text-foreground disabled:opacity-50"
+            className="rounded-xl text-muted-foreground hover:text-foreground shrink-0"
+            onClick={() =>
+              setInputMode(inputMode === "voice" ? "text" : "voice")
+            }
+            title={
+              inputMode === "voice" ? "Passer à l'écrit" : "Passer à la voix"
+            }
+            disabled={isRecording || isProcessing}
+          >
+            {inputMode === "voice" ? (
+              <Keyboard className="w-5 h-5" />
+            ) : (
+              <Mic className="w-5 h-5" />
+            )}
+          </Button>
+          {inputMode === "voice" ? (
+            <Button
+              size="lg"
+              onClick={isRecording ? stopRecording : startRecording}
+              disabled={
+                !sessionId ||
+                isProcessing ||
+                !interviewStarted ||
+                isPlayingAudio
+              }
+              className={cn(
+                "flex-1 h-14 rounded-xl text-lg font-medium shadow-lg transition-all duration-300",
+                isRecording
+                  ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                  : "bg-primary hover:bg-primary/90 text-primary-foreground",
+              )}
+            >
+              {isRecording ? (
+                <div className="flex items-center gap-2">
+                  <StopCircle className="w-5 h-5 fill-current animate-pulse" />
+                  <span className="hidden sm:inline">Terminer</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Mic className="w-5 h-5" />
+                  <span className="hidden sm:inline">
+                    {isProcessing ? "Analyse..." : "Parler"}
+                  </span>
+                </div>
+              )}
+            </Button>
+          ) : (
+            <div className="flex-1 flex gap-2">
+              <div className="flex-1 h-14 bg-secondary/10 rounded-xl flex items-center px-4 border border-transparent focus-within:border-primary/50 transition-all">
+                <input
+                  type="text"
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleTextSubmit()}
+                  placeholder="Votre réponse..."
+                  className="flex-1 bg-transparent border-none focus:outline-none text-foreground placeholder:text-muted-foreground min-w-0"
+                  disabled={isProcessing || isPlayingAudio}
+                  autoFocus
+                />
+              </div>
+              <Button
+                size="icon"
+                onClick={handleTextSubmit}
+                disabled={!textInput.trim() || isProcessing || isPlayingAudio}
+                className="h-14 w-14 rounded-xl shrink-0 shadow-lg"
+              >
+                {isProcessing ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Send className="w-5 h-5" />
+                )}
+              </Button>
+            </div>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-xl text-muted-foreground hover:text-foreground disabled:opacity-50 shrink-0"
             onClick={handleAudioControl}
             disabled={!lastInterviewerMessage}
             title={isPlayingAudio ? "Passer l'audio" : "Rejouer l'audio"}

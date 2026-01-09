@@ -112,20 +112,22 @@ class InterviewService:
         self,
         db: Session,
         interview_id: int,
-        audio_file_path: str,
         user_id: int,
         background_tasks: BackgroundTasks,
+        audio_file_path: str | None = None,
+        text_response: str | None = None,
         language: str = "fr",
     ) -> dict:
         """
-        Process candidate's audio response.
+        Process candidate's response (audio or text).
 
         Args:
             db: Database session
             interview_id: Interview identifier
-            audio_file_path: Path to audio file
             user_id: User identifier
             background_tasks: FastAPI BackgroundTasks for async grading
+            audio_file_path: Path to audio file (optional if text_response provided)
+            text_response: Direct text response (optional)
             language: Language code
 
         Returns:
@@ -143,14 +145,25 @@ class InterviewService:
                     detail="Not authorized to access this interview",
                 )
 
-            logger.info(f"Processing audio for interview {interview_id}")
+            logger.info(f"Processing response for interview {interview_id}")
 
-            # Step 1: Transcribe audio using voice service
-            logger.info("Transcribing audio...")
-            transcribed_text = await self.voice_service.transcribe_audio(
-                audio_file_path, language=language
-            )
-            logger.info(f"Transcription: {transcribed_text}")
+            transcribed_text = ""
+
+            # Step 1: Get text (either from direct input or transcription)
+            if text_response:
+                logger.info("Using text response directly")
+                transcribed_text = text_response
+            elif audio_file_path:
+                logger.info("Transcribing audio...")
+                transcribed_text = await self.voice_service.transcribe_audio(
+                    audio_file_path, language=language
+                )
+            else:
+                raise ValueError(
+                    "Either text_response or audio_file_path must be provided"
+                )
+
+            logger.info(f"User response: {transcribed_text}")
 
             # Step 2: Update the last question with the user's answer
             last_qa = (
